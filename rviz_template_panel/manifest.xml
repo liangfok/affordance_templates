@@ -1,0 +1,28 @@
+<package>
+  <description brief="rviz_template_panel">
+
+     rviz_template_panel
+
+  </description>
+  <author>dinh</author>
+  <license>BSD</license>
+  <review status="unreviewed" notes=""/>
+  <url>http://ros.org/wiki/rviz_template_panel</url>
+
+  <!--<depend package="pluginlib"/>-->
+  <depend package="roslib"/>
+  <depend package="roscpp"/>
+  <depend package="rviz"/>
+  <depend package="visualization_msgs"/>
+  <depend package="geometry_msgs"/>
+  <depend package="interactive_markers"/>
+  <!--  <depend package="marker_templates"/>-->
+  <depend package="marker_templates_server"/>
+
+  <export>
+    <rviz plugin="${prefix}/plugin_description.xml"/>
+  </export>
+
+</package>
+
+

@@ -1,0 +1,4 @@
+<launch>
+  <rosparam command="load" param="robot_name">[r2]</rosparam>
+  <node name="affordance_template_server_v1" pkg="template_server" type="server.py" output="screen"/>
+</launch>

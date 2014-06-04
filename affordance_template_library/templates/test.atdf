@@ -1,0 +1,44 @@
+<?xml version="1.0" ?>
+<!--This does not replace URDF, and is not an extension of URDF.
+    This is a format for representing semantic information about the robot structure.
+    A URDF file must exist for this robot as well, where the joints and the links that are referenced are defined
+-->
+<template name="test_template" image="package://affordance_template_library/images/test.jpg">
+
+    <display_objects>
+        <display_object name="root_box">
+            <geometry>
+                <shape type="box" scale="1 1 1" color="1 0 .2 .8"/>
+            </geometry>
+            <origin xyz="0 0 0" rpy="0 0 0"/>
+            <controls xyz="1 1 1" rpy="1 1 1"/>
+        </display_object>
+        <display_object name="child_mesh">
+            <geometry>
+                <mesh filename="package://affordance_template_library/models/head.stl" scale="1 1 1"/>
+            </geometry>
+            <origin xyz=".5 0 0" rpy="0 0 0"/>
+            <controls xyz="0 0 0" rpy="1 1 1"/>
+        </display_object>
+    </display_objects>
+
+    <waypoints>
+        <end_effector id="0">
+            <waypoint display_object="root_box" xyz="1 1 0" rpy="0 0 0">
+                <controls xyz="1 1 1" rpy="1 1 1"/>
+            </waypoint>
+            <waypoint display_object="root_box" xyz="1.5 1 0" rpy=".25 0 0">
+                <controls xyz="1 0 0" rpy="0 0 0"/>
+            </waypoint>
+        </end_effector>
+        <end_effector id="1">
+            <waypoint display_object="root_box" xyz="1 -1 0" rpy="0 0 0">
+                <controls xyz="0 0 0" rpy="0 1 0"/>
+            </waypoint>
+            <waypoint display_object="root_box" xyz="1.5 -1 0" rpy=".25 0 0">
+                <controls xyz="0 0 0" rpy="0 0 0"/>
+            </waypoint>
+        </end_effector>
+    </waypoints>
+
+</template>

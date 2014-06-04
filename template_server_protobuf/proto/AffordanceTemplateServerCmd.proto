@@ -1,0 +1,45 @@
+// namespace::class_type
+message Position {
+    required float x = 1;
+    required float y = 2;
+    required float z = 3;
+}
+
+message Orientation {
+    required float x = 1;
+    required float y = 2;
+    required float z = 3;
+    required float w = 4;
+}
+
+message Pose {
+    required Position position = 1;
+    required Orientation orientation = 2;
+}
+
+message Template {
+    required string type = 1;        // template_type e.g. "Waypoint", "Car", "Wheel", "BORING"
+    optional int32 id = 2;           // ID of the template object on the server
+    optional string image_path = 3;  // contains path to image of template (used in rviz)
+}
+
+message Request {
+    enum Type {
+        ADD = 0;       // add a new template to the server
+        DELETE = 1;    // delete a template from the server
+        RESET = 2;     // clear all templates from the server
+        QUERY = 3;     // query available templates to be added
+        SHUTDOWN = 4;  // shutdown the server
+        PING = 5;      // ping message
+        KILL = 6;      // kill a template
+        RUNNING = 7;   // get running templates
+    }
+    required Type type = 1;
+    repeated Template marker_template = 2;
+    optional Pose pose = 3;
+}
+
+message Response {
+    required bool success = 1;
+    repeated Template marker_template = 2;
+}

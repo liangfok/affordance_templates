@@ -1,0 +1,100 @@
+<library path="lib/libmarker_templates">
+    <class name="marker_templates/Hands"
+           type="marker_templates::Hands"
+           base_class_type="marker_templates::MarkerTemplate">
+        <description>
+            A hand template.
+        </description>
+    </class>
+    <class name="marker_templates/Drill"
+           type="marker_templates::Drill"
+           base_class_type="marker_templates::MarkerTemplate">
+        <description>
+            A template to use a SKIL drill.
+        </description>
+    </class>
+    <class name="marker_templates/SmallWheel"
+           type="marker_templates::SmallWheel"
+           base_class_type="marker_templates::MarkerTemplate">
+        <description>
+            A small (9in) wheel template with pre-grasp, grasp and post-grasp hand markers.
+        </description>
+    </class>
+    <class name="marker_templates/LargeWheel"
+           type="marker_templates::LargeWheel"
+           base_class_type="marker_templates::MarkerTemplate">
+        <description>
+            A large (18in) wheel template with pre-grasp, grasp and post-grasp hand markers.
+        </description>
+    </class>
+    <class name="marker_templates/Lever"
+           type="marker_templates::Lever"
+           base_class_type="marker_templates::MarkerTemplate">
+        <description>
+            A lever template (for door handle or ball valve) pre-grasp, grasp, goal and release hand markers.
+        </description>
+    </class>
+    <class name="marker_templates/BallValve"
+           type="marker_templates::BallValve"
+           base_class_type="marker_templates::MarkerTemplate">
+        <description>
+            A template for turning a ball valve.
+        </description>
+    </class>
+<!--     <class name="marker_templates/Lumber"
+           type="marker_templates::Lumber"
+           base_class_type="marker_templates::MarkerTemplate">
+        <description>
+            A template for lumber.
+        </description>
+    </class>
+    <class name="marker_templates/COM"
+           type="marker_templates::COM"
+           base_class_type="marker_templates::MarkerTemplate">
+        <description>
+            A marker to set the COM ref of the robot.
+        </description>
+    </class>
+    <class name="marker_templates/Door"
+           type="marker_templates::Door"
+           base_class_type="marker_templates::MarkerTemplate">
+        <description>
+            A marker to set Door control refs for the robot.
+        </description>
+    </class>
+    <class name="marker_templates/Stairs"
+           type="marker_templates::Stairs"
+           base_class_type="marker_templates::MarkerTemplate">
+        <description>
+            A marker to set Stairs Parameters.
+        </description>
+    </class>
+    <class name="marker_templates/Hose"
+           type="marker_templates::Hose"
+           base_class_type="marker_templates::MarkerTemplate">
+        <description>
+            A marker to set Hose Parameters.
+        </description>
+    </class>
+    <class name="marker_templates/Reel"
+           type="marker_templates::Reel"
+           base_class_type="marker_templates::MarkerTemplate">
+        <description>
+            A marker to set Reel Parameters.
+        </description>
+    </class>
+    <class name="marker_templates/Wye"
+           type="marker_templates::Wye"
+           base_class_type="marker_templates::MarkerTemplate">
+        <description>
+            A marker to set Wye Parameters.
+        </description>
+    </class>
+    <class name="marker_templates/Link"
+           type="marker_templates::Link"
+           base_class_type="marker_templates::MarkerTemplate">
+        <description>
+            A marker to set Link Parameters.
+        </description>
+    </class>
+ --></library>

@@ -1,0 +1,9 @@
+<library path="lib/librviz_template_panel">
+  <class name="rviz_template_panel/TemplatePanel"
+         type="rviz_template_panel::TemplatePanel"
+         base_class_type="rviz::Panel">
+    <description>
+      A panel widget providing Interactive Marker object templates.
+    </description>
+  </class>
+</library>
