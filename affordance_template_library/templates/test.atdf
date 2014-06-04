@@ -1,10 +1,5 @@
 <?xml version="1.0" ?>
-<!--This does not replace URDF, and is not an extension of URDF.
-    This is a format for representing semantic information about the robot structure.
-    A URDF file must exist for this robot as well, where the joints and the links that are referenced are defined
--->
 <template name="test_template" image="package://affordance_template_library/images/test.jpg">
-
     <display_objects>
         <display_object name="root_box">
             <geometry>
@@ -21,7 +16,6 @@
             <controls xyz="0 0 0" rpy="1 1 1"/>
         </display_object>
     </display_objects>
-
     <waypoints>
         <end_effector id="0">
             <waypoint display_object="root_box" xyz="1 1 0" rpy="0 0 0">
@@ -40,5 +34,4 @@
             </waypoint>
         </end_effector>
     </waypoints>
-
 </template>
