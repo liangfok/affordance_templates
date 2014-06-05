@@ -32,9 +32,24 @@ xmlr.reflect(Pose, params = [
     ])
 
 
+class Controls(xmlr.Object):
+    def __init__(self, xyz=None, rpy=None):
+        self.xyz = xyz
+        self.rpy = rpy
+
+    def check_valid(self):
+        assert self.xyz is not None or self.rpy is not None
+
+xmlr.reflect(Controls, params = [
+    xmlr.Attribute('xyz', 'vector3', False),
+    xmlr.Attribute('rpy', 'vector3', False)
+    ])
+
+
 # Common stuff
 name_attribute = xmlr.Attribute('name', str)
 origin_element = xmlr.Element('origin', Pose, False)
+controls_element = xmlr.Element('controls', Controls, False)
 
 class Color(xmlr.Object):
     def __init__(self, *args):
@@ -146,14 +161,16 @@ xmlr.add_type('geometric', GeometricType())
 
 
 class DisplayObject(xmlr.Object):
-    def __init__(self, name = None, geometry = None, origin = None, material = None):
+    def __init__(self, name = None, geometry = None, origin = None, material = None, controls = None):
         self.name = name
         self.origin = origin
+        self.controls = controls
         self.geometry = geometry
         self.material = material
 
 xmlr.reflect(DisplayObject, params = [
     origin_element,
+    controls_element,
     xmlr.Element('geometry', 'geometric'),
     xmlr.Element('material', Material, False),
     xmlr.Attribute('name', str, True)
@@ -161,38 +178,9 @@ xmlr.reflect(DisplayObject, params = [
 
 class DisplayObjects(xmlr.Object):
     def __init__(self, name = None):
-        self.objects = []
-
-xmlr.reflect(DisplayObjects, params = [
-    xmlr.Element('display_object', DisplayObject)
-    ])
-
-# class EndEffectorWaypoint(xmlr.Object):
-#     def __init__(self, id = None):
-#         self.id = id
-
-# xmlr.reflect(EndEffectorWaypoint, params = [
-#     xmlr.Attribute('id', str, False)
-#     ])
-
-# class EndEffectorWaypoints(xmlr.Object):
-#     def __init__(self):
-#         self.waypoints = []
-
-# xmlr.reflect(EndEffectorWaypoints, params = [
-#     xmlr.Attribute('end_effector_waypoint', EndEffectorWaypoint)
-#     ])
-
-class AffordanceTemplate(xmlr.Object):
-    def __init__(self, name = None):
         self.aggregate_init()
-
-        self.name = name
         self.display_objects = []
-        self.end_effector_waypoints = []
-
         self.display_object_map = {}
-        self.end_effector_waypoint_map = {}
 
     def add_aggregate(self, typeName, elem):
         xmlr.Object.add_aggregate(self, typeName, elem)
@@ -200,15 +188,60 @@ class AffordanceTemplate(xmlr.Object):
         if typeName == 'display_object':
             display_object = elem
             self.display_object_map[display_object.name] = display_object
-        elif typeName == 'end_effector_waypoint':
-            end_effector_waypoint = elem
-            self.end_effector_waypoint_map[end_effector_waypoint.name] = end_effector_waypoint
 
     def add_display_object(self, display_object):
         self.add_aggregate('display_object', display_object)
 
+xmlr.reflect(DisplayObjects, params = [
+    xmlr.AggregateElement('display_object', DisplayObject)
+    ])
+
+
+
+
+class EndEffectorWaypoint(xmlr.Object):
+    def __init__(self, end_effector = None, id = None, display_object = None, origin = None, controls = None):
+        self.id = id
+        self.end_effector = end_effector
+        self.display_object = display_object
+        self.controls = controls
+        self.origin = origin
+
+xmlr.reflect(EndEffectorWaypoint, params = [
+    origin_element,
+    controls_element,
+    xmlr.Attribute('id', str, True),
+    xmlr.Attribute('end_effector', str, True),
+    xmlr.Attribute('display_object', str, True)
+    ])
+
+class EndEffectorWaypoints(xmlr.Object):
+    def __init__(self):
+        self.aggregate_init()
+        self.end_effector_waypoints = []
+        self.end_effector_waypoint_map = {}
+
+    def add_aggregate(self, typeName, elem):
+        xmlr.Object.add_aggregate(self, typeName, elem)
+
+        if typeName == 'end_effector_waypoint':
+            end_effector_waypoint = elem
+            self.end_effector_waypoint_map[end_effector_waypoint.id] = end_effector_waypoint
+
     def add_end_effector_waypoint(self, end_effector_waypoint):
         self.add_aggregate('end_effector_waypoint', waypoint)
+
+
+xmlr.reflect(EndEffectorWaypoints, params = [
+    xmlr.AggregateElement('end_effector_waypoint', EndEffectorWaypoint)
+    ])
+
+class AffordanceTemplate(xmlr.Object):
+    def __init__(self, name = None):
+        self.aggregate_init()
+        self.name = name
+        self.display_objects = None
+        self.end_effector_waypoints = None
 
     @classmethod
     def from_file(cls, key = 'template_description'):
@@ -220,15 +253,14 @@ class AffordanceTemplate(xmlr.Object):
         return cls.from_xml_string(f.read())
 
 xmlr.reflect(AffordanceTemplate, tag = 'template', params = [
-#   name_attribute,
     xmlr.Attribute('name', str, True),
     xmlr.Attribute('image', str, False),
-    xmlr.AggregateElement('display_object', DisplayObject)
-    # xmlr.Attribute('end_effector_waypoints', EndEffectorWaypoints)
+    xmlr.Element('display_objects', DisplayObjects),
+    xmlr.Element('end_effector_waypoints', EndEffectorWaypoints)
     ])
 
 # Make an alias
-RTDF = AffordanceTemplate
+ATDF = AffordanceTemplate
 
 xmlr.end_namespace()
 
