@@ -30,16 +30,18 @@ xmlr.reflect(Pose, params = [
 
 
 class Controls(xmlr.Object):
-    def __init__(self, xyz=None, rpy=None):
+    def __init__(self, xyz=None, rpy=None, scale=None):
         self.xyz = xyz
         self.rpy = rpy
+        self.scale = scale
 
     def check_valid(self):
         assert self.xyz is not None or self.rpy is not None
 
 xmlr.reflect(Controls, params = [
     xmlr.Attribute('xyz', 'vector3', False),
-    xmlr.Attribute('rpy', 'vector3', False)
+    xmlr.Attribute('rpy', 'vector3', False),
+    xmlr.Attribute('scale', float),
     ])
 
 

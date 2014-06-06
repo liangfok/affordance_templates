@@ -168,7 +168,11 @@ class AffordanceTemplateCreator(object) :
             control.markers[0].action = Marker.ADD
             print control.markers[0]
 
-            int_marker = CreateInteractiveMarker(frame_id, obj.name, .25)
+            scale = 1.0
+            if obj.controls.scale != None :
+                scale = obj.controls.scale
+
+            int_marker = CreateInteractiveMarker(frame_id, obj.name, scale)
             int_marker.controls.append(control)
             int_marker.controls.extend(Create6DOFControls())
 

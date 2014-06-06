@@ -11,33 +11,33 @@
                 <color rgba="0 1.0 1.0 1.0"/>
             </material>
             <origin xyz="0 0 0" rpy="0 0 0"/>
-            <controls xyz="1 1 1" rpy="1 1 1"/>
+            <controls xyz="1 1 1" rpy="1 1 1" scale="0.25"/>
         </display_object>
         <display_object name="child_mesh">
             <geometry>
                 <mesh filename="package://affordance_template_library/models/head.stl" scale="1 1 1"/>
             </geometry>
             <origin xyz=".5 0 0" rpy="0 0 0"/>
-            <controls xyz="0 0 0" rpy="1 1 1"/>
+            <controls xyz="0 0 0" rpy="1 1 1" scale="0.25"/>
         </display_object>
     </display_objects>
 
     <end_effector_waypoints>
         <end_effector_waypoint end_effector="0" id="0" display_object="root_box">
             <origin  xyz="1 1 0" rpy="0 0 0"/>
-            <controls xyz="1 1 1" rpy="1 1 1"/>
+            <controls xyz="1 1 1" rpy="1 1 1" scale="0.25"/>
         </end_effector_waypoint>
         <end_effector_waypoint end_effector="0" id="1" display_object="root_box">
             <origin  xyz="1.5 1 0" rpy=".25 0 0"/>
-            <controls xyz="1 0 0" rpy="0 0 0"/>
+            <controls xyz="1 0 0" rpy="0 0 0" scale="0.25"/>
         </end_effector_waypoint>
         <end_effector_waypoint end_effector="1" id="0" display_object="root_box">
             <origin xyz="1 -1 0" rpy="0 0 0"/>
-            <controls xyz="0 0 0" rpy="0 1 0"/>
+            <controls xyz="0 0 0" rpy="0 1 0" scale="0.25"/>
         </end_effector_waypoint>
         <end_effector_waypoint end_effector="1" id="1" display_object="root_box">
             <origin xyz="1.5 -1 0" rpy=".25 0 0"/>
-            <controls xyz="0 0 0" rpy="0 0 0"/>
+            <controls xyz="0 0 0" rpy="0 0 0" scale="0.25"/>
         </end_effector_waypoint>
     </end_effector_waypoints>
 
