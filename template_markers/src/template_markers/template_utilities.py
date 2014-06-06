@@ -149,6 +149,18 @@ def CreateVisualControlFromMarker(marker, always_visible=True, interaction_mode=
     control.markers.append(marker)
     return control
 
+def CreateCustomDOFControls(prefix=None, tx=False, ty=False, tz=False, rr=False, rp=False, ry=False):
+    controls = []
+    if not prefix: prefix = ""
+    if tx : controls.append(CreateTransRotControl(prefix + "TranslateX"))
+    if ty : controls.append(CreateTransRotControl(prefix + "TranslateY"))
+    if tz : controls.append(CreateTransRotControl(prefix + "TranslateZ"))
+    if rr : controls.append(CreateTransRotControl(prefix + "RotateX"))
+    if rp : controls.append(CreateTransRotControl(prefix + "RotateY"))
+    if ry : controls.append(CreateTransRotControl(prefix + "RotateZ"))
+    return controls
+
+
 def Create6DOFControls(prefix=None):
     """Creates 6 DOF controls.
 

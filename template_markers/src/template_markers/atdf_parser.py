@@ -160,19 +160,21 @@ xmlr.add_type('geometric', GeometricType())
 
 
 class DisplayObject(xmlr.Object):
-    def __init__(self, name = None, geometry = None, origin = None, material = None, controls = None):
+    def __init__(self, name = None, geometry = None, origin = None, material = None, controls = None, parent = None):
         self.name = name
         self.origin = origin
         self.controls = controls
         self.geometry = geometry
         self.material = material
+        self.parent = parent
 
 xmlr.reflect(DisplayObject, params = [
     origin_element,
     controls_element,
     xmlr.Element('geometry', 'geometric'),
     xmlr.Element('material', Material, False),
-    xmlr.Attribute('name', str, True)
+    xmlr.Attribute('name', str, True),
+    xmlr.Attribute('parent', str, False)
     ])
 
 class DisplayObjects(xmlr.Object):

@@ -20,57 +20,34 @@ class AffordanceTemplate(object) :
 
     def __init__(self, server, id, name, initial_pose=None):
         self.menu_handler = MenuHandler()
-        self.menu_handler.insert("Delete", callback=self.deleteCallback)
+        self.menu_handler.insert("Delete", callback=self.delete_callback)
         self.server = server
+        self.frame_id = "world"
         self.key = name + str(id)
+        self.root_object = ""
+        self.parent_map = {}
         self.marker_map = {}
         self.callback_map = {}
+        self.marker_pose_offset = {}
+
         # not all templates will have a dynamic reconfigure server
         self.dserver = None
         self.initial_pose = initial_pose
 
-    # @property
-    # def initial_pose(self):
-    #     """Return a marker's initial pose if it was passed in."""
-    #     return self.initial_pose
+    def set_root_object(self, name) :
+        self.root_object = name
 
-    # # @property
-    # # def key(self):
-    # #     """Get the marker template's key on the server."""
-    # #     key = self.key + str(self.id)
-    # #     return key
-
-    # @property
-    # def server(self):
-    #     """Get the marker template's interactive marker server."""
-    #     return self.server
-
-    # @property
-    # def marker_map(self):
-    #     """Get the interactive marker map of this marker template."""
-    #     return self.marker_map
-
-    # @property
-    # def callback_map(self):
-    #     """Get the callback map of this marker template."""
-    #     return self.callback_map
-
-    # @property
-    # def menu_handler(self):
-    #     """Get the menu handler of this marker template."""
-    #     return self.menu_handler
-
-    def addInteractiveMarker(self, marker, callback=None):
+    def add_interactive_marker(self, marker, callback=None):
         name = marker.name
         self.marker_map[name] = marker
         if callback:
             self.callback_map[name] = callback
             return self.server.insert(marker, callback)
         else:
-            self.callback_map[name] = self.processFeedback
-            return self.server.insert(marker, self.processFeedback)
+            self.callback_map[name] = self.process_feedback
+            return self.server.insert(marker, self.process_feedback)
 
-    def removeInteractiveMarker(self, marker_name):
+    def remove_interactive_marker(self, marker_name):
         if self.server.erase(marker_name):
             if marker_name in self.marker_map:
                 del self.marker_map[marker_name]
@@ -78,34 +55,52 @@ class AffordanceTemplate(object) :
                 return True
         return False
 
-    def attachMenuHandler(self, marker):
+    def attach_menu_handler(self, marker):
         return self.menu_handler.apply(self.server, marker.name)
 
-    def getMarker(self):
+    def get_marker(self):
         return self.server.get(self._key)
 
-    def hasMarker(self):
+    def has_marker(self):
         if self._key in self.marker_map.keys():
             return True
         else:
             return False
 
-    def deleteCallback(self, feedback):
+    def delete_callback(self, feedback):
         for key in self.marker_map.keys():
             self.server.erase(key)
         self.server.applyChanges()
-        self.tearDown()
+        self.tear_down()
 
-    def tearDown(self, keepAlive=False):
+    def tear_down(self, keep_alive=False):
         # forcefully shut down service before killing node
-        if self._dserver:
-            self._dserver.set_service.shutdown("User deleted template.")
+        if self.dserver:
+            self.dserver.set_service.shutdown("User deleted template.")
         # for rostest (and potentially other cases), we want to clean up but keep the node alive
-        if not keepAlive:
+        if not keep_alive:
             rospy.signal_shutdown("User deleted template.")
 
-    def processFeedback(self, feedback):
+    def process_feedback(self, feedback):
+        # print feedback.marker_name
+        for m in self.marker_map.keys() :
+            if m in self.parent_map :
+                if self.parent_map[m] == feedback.marker_name :
+                    print "need to update marker ", m
+                    rTm = getFrameFromPose(feedback.pose)
+                    T = getFrameFromPose(self.marker_pose_offset[m])
+                    p = getPoseFromFrame(rTm*T)
+                    self.server.setPose(m, p)
         self.server.applyChanges()
+        if feedback.event_type == InteractiveMarkerFeedback.MOUSE_UP :
+            To = getFrameFromPose(self.marker_pose_offset[feedback.marker_name])
+            T = getFrameFromPose(feedback.pose)
+
+            if feedback.marker_name in self.parent_map:
+                Tp = getFrameFromPose(self.marker_pose_offset[self.parent_map[feedback.marker_name]])
+                self.marker_pose_offset[feedback.marker_name] = getPoseFromFrame(Tp.Inverse()*T)
+            else :
+                self.marker_pose_offset[feedback.marker_name] = getPoseFromFrame(T)
 
 
 class AffordanceTemplateCreator(object) :
@@ -114,7 +109,7 @@ class AffordanceTemplateCreator(object) :
         self.affordamce_template = None
         self.server = server
 
-    def createFromStructure(self) :
+    def create_from_structure(self) :
 
         if self.structure == None :
             return False
@@ -122,8 +117,10 @@ class AffordanceTemplateCreator(object) :
         self.affordance_template = AffordanceTemplate(self.server, 0, self.structure.name)
 
         ids = 0
-        frame_id = "world"
         for obj in self.structure.display_objects.display_objects :
+
+            if ids == 0:
+                self.affordance_template.set_root_object(obj.name)
 
             control = InteractiveMarkerControl()
 
@@ -157,39 +154,44 @@ class AffordanceTemplateCreator(object) :
                 control.markers[0].scale.y = obj.geometry.radius
                 control.markers[0].scale.z = obj.geometry.length
 
-            control.markers[0].header.frame_id = frame_id
-
             if not obj.material == None :
                 control.markers[0].color.r = obj.material.color.rgba[0]
                 control.markers[0].color.g = obj.material.color.rgba[1]
                 control.markers[0].color.b = obj.material.color.rgba[2]
                 control.markers[0].color.a = obj.material.color.rgba[3]
+                if isinstance(obj.geometry, Mesh) :
+                    control.markers[0].mesh_use_embedded_materials = False
 
+            control.markers[0].header.frame_id = self.affordance_template.frame_id
             control.markers[0].action = Marker.ADD
-            print control.markers[0]
+            # print control.markers[0]
 
             scale = 1.0
             if obj.controls.scale != None :
                 scale = obj.controls.scale
-
-            int_marker = CreateInteractiveMarker(frame_id, obj.name, scale)
+            int_marker = CreateInteractiveMarker(self.affordance_template.frame_id, obj.name, scale)
             int_marker.controls.append(control)
-            int_marker.controls.extend(Create6DOFControls())
+            int_marker.controls.extend(CreateCustomDOFControls("",
+                obj.controls.xyz[0], obj.controls.xyz[1], obj.controls.xyz[2],
+                obj.controls.rpy[0], obj.controls.rpy[1], obj.controls.rpy[2]))
 
-            self.affordance_template.marker_map[obj.name] = control.markers[0]
-            ids += 1
-
-            self.affordance_template.addInteractiveMarker(int_marker)
+            self.affordance_template.add_interactive_marker(int_marker)
             self.server.applyChanges()
 
+            self.affordance_template.marker_map[obj.name] = control.markers[0]
+            self.affordance_template.marker_pose_offset[obj.name] = p
 
-    def loadFromFile(self, filename) :
+            if not obj.parent == None :
+                self.affordance_template.parent_map[obj.name] = obj.parent
+
+            ids += 1
+
+    def load_from_file(self, filename) :
         self.structure = AffordanceTemplateStructure.from_file(filename)
-        self.createFromStructure()
-
+        self.create_from_structure()
         return self.structure
 
-    def printStructure(self) :
+    def print_structure(self) :
         print "---------------------"
         print "---------------------"
         print "found new template:"
@@ -198,6 +200,9 @@ class AffordanceTemplateCreator(object) :
         for obj in self.structure.display_objects.display_objects :
             print "---------------------"
             print "\tobject: ", obj.name
+            if not obj.parent == None :
+                print "\tparent: ", obj.parent
+
             print "----------------"
             print "\torigin xyz: ", obj.origin.xyz
             print "\torigin rpy: ", obj.origin.rpy
@@ -244,8 +249,8 @@ if __name__ == '__main__':
         print filename
 
         ats = AffordanceTemplateCreator(server)
-        at = ats.loadFromFile(filename)
-        # ats.printStructure()
+        at = ats.load_from_file(filename)
+        ats.print_structure()
 
         rospy.spin()
 
