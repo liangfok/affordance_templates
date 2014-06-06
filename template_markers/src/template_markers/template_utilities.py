@@ -106,13 +106,14 @@ def CreateInteractiveMarker(frame_id, name, scale):
     interactive_marker.scale = scale
     return interactive_marker
 
-def CreatePrimitiveMarker(scaleFactor, marker_type, id=randint(0,10000)):
+def CreatePrimitiveMarker(name, pose, scaleFactor, marker_type, id=randint(0,10000)):
     marker = Marker()
-    marker.ns = "visual"
+    marker.ns = name
     marker.id = id
     marker.scale.x = scaleFactor
     marker.scale.y = scaleFactor
     marker.scale.z = scaleFactor
+    marker.pose = pose
     marker.type = marker_type
     marker.pose.orientation.w = 1.0
     return marker
@@ -131,8 +132,8 @@ def CreateMeshMarker(pose, mesh_path, alpha = 1, scaleFactor=1, id=randint(0,100
     marker.frame_locked = True
     return marker
 
-def CreatePrimitiveControl(name, scaleFactor, marker_type, id=randint(0,10000)):
-    marker = CreatePrimitiveMarker(name, scaleFactor, marker_type, id)
+def CreatePrimitiveControl(name, pose, scaleFactor, marker_type, id=randint(0,10000)):
+    marker = CreatePrimitiveMarker(name, pose, scaleFactor, marker_type, id)
     control = InteractiveMarkerControl()
     control.name = name
     control.always_visible = True

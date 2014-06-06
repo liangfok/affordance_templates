@@ -37,7 +37,7 @@ class TaskTemplate(MarkerTemplate):
         self._feet = {}
         self._feet[LEFT] = []
         self._feet[RIGHT] = []
-        
+
         # self._handFiles holds files for hand paths?
         self._handFiles = {}
         self._handFiles[LEFT] = []
@@ -54,7 +54,7 @@ class TaskTemplate(MarkerTemplate):
         self._numPtsPerSeq = 1
         self._leftHandPathIndex = -1
         self._rightHandPathIndex = -1
-        
+
         self._tfListener = tf.TransformListener()
         self._streamThread = None
 
@@ -375,7 +375,7 @@ class TaskTemplate(MarkerTemplate):
         hand = HandMarker(self.server, self._name, hand, color)
         if hand is not None:
             self._hands[hand] = hand
-        
+
 
     def syncHandsWithActual(self, feedback):
         try:
@@ -515,7 +515,7 @@ class TaskTemplate(MarkerTemplate):
                         ps.pose = pose
                         newPs = self._tfListener.transformPose("/world", ps)
                         newPose = newPs.pose
-                            
+
                     except:
                         pass
                 self._handPoseArray[LEFT][self._leftHandPathIndex].poses.append(newPose)

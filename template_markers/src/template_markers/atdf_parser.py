@@ -3,9 +3,6 @@ import nasa_robot_teleop.xml_reflection.core as xmlr
 
 xmlr.start_namespace('atdf')
 
-xmlr.add_type('element_link', xmlr.SimpleElementType('link', str))
-xmlr.add_type('element_xyz', xmlr.SimpleElementType('xyz', 'vector3'))
-
 verbose = True
 
 class Pose(xmlr.Object):
@@ -236,7 +233,7 @@ xmlr.reflect(EndEffectorWaypoints, params = [
     xmlr.AggregateElement('end_effector_waypoint', EndEffectorWaypoint)
     ])
 
-class AffordanceTemplate(xmlr.Object):
+class AffordanceTemplateStructure(xmlr.Object):
     def __init__(self, name = None):
         self.aggregate_init()
         self.name = name
@@ -252,7 +249,7 @@ class AffordanceTemplate(xmlr.Object):
             f.close()
         return cls.from_xml_string(f.read())
 
-xmlr.reflect(AffordanceTemplate, tag = 'template', params = [
+xmlr.reflect(AffordanceTemplateStructure, tag = 'affordance_template', params = [
     xmlr.Attribute('name', str, True),
     xmlr.Attribute('image', str, False),
     xmlr.Element('display_objects', DisplayObjects),
@@ -260,7 +257,7 @@ xmlr.reflect(AffordanceTemplate, tag = 'template', params = [
     ])
 
 # Make an alias
-ATDF = AffordanceTemplate
+ATDF = AffordanceTemplateStructure
 
 xmlr.end_namespace()
 

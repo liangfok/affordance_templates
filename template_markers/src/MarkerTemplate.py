@@ -72,7 +72,7 @@ class MarkerTemplate(object):
             self._callback_map[name] = self.processFeedback
             return self.server.insert(marker, self.processFeedback)
 
-    def removeInteractiveMarker(self, marker_name):  
+    def removeInteractiveMarker(self, marker_name):
         if self.server.erase(marker_name):
             if marker_name in self._marker_map:
                 del self._marker_map[marker_name]
@@ -91,7 +91,7 @@ class MarkerTemplate(object):
             return True
         else:
             return False
-            
+
     def deleteCallback(self, feedback):
         for key in self._marker_map.keys():
             self.server.erase(key)

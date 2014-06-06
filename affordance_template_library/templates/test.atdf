@@ -1,10 +1,11 @@
 <?xml version="1.0" ?>
-<template name="test_template" image="package://affordance_template_library/images/test.jpg">
+<affordance_template name="test_template" image="package://affordance_template_library/images/test.jpg">
 
     <display_objects>
         <display_object name="root_box">
             <geometry>
-                <box size="1 1 1"/>
+                <box size=".1 .1 .1"/>
+<!--                 <sphere radius=".15"/> -->
             </geometry>
             <material name="Cyan">
                 <color rgba="0 1.0 1.0 1.0"/>
@@ -20,6 +21,7 @@
             <controls xyz="0 0 0" rpy="1 1 1"/>
         </display_object>
     </display_objects>
+
     <end_effector_waypoints>
         <end_effector_waypoint end_effector="0" id="0" display_object="root_box">
             <origin  xyz="1 1 0" rpy="0 0 0"/>
@@ -38,4 +40,5 @@
             <controls xyz="0 0 0" rpy="0 0 0"/>
         </end_effector_waypoint>
     </end_effector_waypoints>
-</template>
+
+</affordance_template>
