@@ -1,0 +1,3 @@
+*.pyc
+*~
+template_server_protobuf/proto_gen/*
