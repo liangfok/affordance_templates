@@ -2,10 +2,11 @@
 <affordance_template name="test_template" image="package://affordance_template_library/images/test.jpg">
 
     <display_objects>
-        <display_object name="root_box">
+        <display_object name="root_object">
             <geometry>
-                <box size=".1 .1 .1"/>
+<!--                <box size=".1 .1 .1"/> -->
 <!--                 <sphere radius=".15"/> -->
+                <cylinder radius=".15" length=".2"/>
             </geometry>
             <material name="Cyan">
                 <color rgba="0 1.0 1.0 1.0"/>
@@ -13,29 +14,29 @@
             <origin xyz="0 0 0" rpy="0 0 0"/>
             <controls xyz="0 0 1" rpy="0 0 0" scale="0.25"/>
         </display_object>
-        <display_object name="child_mesh" parent="root_box">
+        <display_object name="drill" parent="root_object">
             <geometry>
                 <mesh filename="package://affordance_template_library/models/cordless_drill.stl" scale="1 1 1"/>
             </geometry>
-            <origin xyz="0 0 0" rpy="0 0 0"/>
+            <origin xyz="0 0 0.1" rpy="0 0 0"/>
             <controls xyz="1 1 0" rpy="0 0 1" scale="0.25"/>
         </display_object>
     </display_objects>
 
     <end_effector_waypoints>
-        <end_effector_waypoint end_effector="0" id="0" display_object="root_box">
+        <end_effector_waypoint end_effector="0" id="0" display_object="root_object">
             <origin  xyz="1 1 0" rpy="0 0 0"/>
             <controls xyz="1 1 1" rpy="1 1 1" scale="0.25"/>
         </end_effector_waypoint>
-        <end_effector_waypoint end_effector="0" id="1" display_object="root_box">
+        <end_effector_waypoint end_effector="0" id="1" display_object="root_object">
             <origin  xyz="1.5 1 0" rpy=".25 0 0"/>
             <controls xyz="1 0 0" rpy="0 0 0" scale="0.25"/>
         </end_effector_waypoint>
-        <end_effector_waypoint end_effector="1" id="0" display_object="root_box">
+        <end_effector_waypoint end_effector="1" id="0" display_object="root_object">
             <origin xyz="1 -1 0" rpy="0 0 0"/>
             <controls xyz="0 0 0" rpy="0 1 0" scale="0.25"/>
         </end_effector_waypoint>
-        <end_effector_waypoint end_effector="1" id="1" display_object="root_box">
+        <end_effector_waypoint end_effector="1" id="1" display_object="root_object">
             <origin xyz="1.5 -1 0" rpy=".25 0 0"/>
             <controls xyz="0 0 0" rpy="0 0 0" scale="0.25"/>
         </end_effector_waypoint>

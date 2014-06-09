@@ -37,6 +37,9 @@ class AffordanceTemplate(object) :
     def set_root_object(self, name) :
         self.root_object = name
 
+    def get_root_object(self) :
+        return self.root_object
+
     def add_interactive_marker(self, marker, callback=None):
         name = marker.name
         self.marker_map[name] = marker
@@ -86,7 +89,6 @@ class AffordanceTemplate(object) :
         for m in self.marker_map.keys() :
             if m in self.parent_map :
                 if self.parent_map[m] == feedback.marker_name :
-                    print "need to update marker ", m
                     rTm = getFrameFromPose(feedback.pose)
                     T = getFrameFromPose(self.marker_pose_offset[m])
                     p = getPoseFromFrame(rTm*T)
@@ -109,6 +111,22 @@ class AffordanceTemplateCreator(object) :
         self.affordamce_template = None
         self.server = server
 
+    def pose_from_origin(self, origin) :
+        p = geometry_msgs.msg.Pose()
+        p.orientation.w = 1
+        try:
+            q = (kdl.Rotation.RPY(origin.rpy[0],origin.rpy[1],origin.rpy[2])).GetQuaternion()
+            p.position.x = origin.xyz[0]
+            p.position.y = origin.xyz[1]
+            p.position.z = origin.xyz[2]
+            p.orientation.x = q[0]
+            p.orientation.y = q[1]
+            p.orientation.z = q[2]
+            p.orientation.w = q[3]
+        except :
+            rospy.logerr("AffordanceTemplateCreator::pose_from_origin() error")
+        return p
+
     def create_from_structure(self) :
 
         if self.structure == None :
@@ -116,23 +134,23 @@ class AffordanceTemplateCreator(object) :
 
         self.affordance_template = AffordanceTemplate(self.server, 0, self.structure.name)
 
+        # parse objects
         ids = 0
         for obj in self.structure.display_objects.display_objects :
 
             if ids == 0:
                 self.affordance_template.set_root_object(obj.name)
 
+            p = self.pose_from_origin(obj.origin)
+
+            int_marker = InteractiveMarker()
             control = InteractiveMarkerControl()
 
-            p = geometry_msgs.msg.Pose()
-            q = (kdl.Rotation.RPY(obj.origin.rpy[0],obj.origin.rpy[1],obj.origin.rpy[2])).GetQuaternion()
-            p.position.x = obj.origin.xyz[0]
-            p.position.y = obj.origin.xyz[1]
-            p.position.z = obj.origin.xyz[2]
-            p.orientation.x = q[0]
-            p.orientation.y = q[1]
-            p.orientation.z = q[2]
-            p.orientation.w = q[3]
+            int_marker.header.frame_id = self.affordance_template.frame_id
+            int_marker.pose = p
+            int_marker.name = obj.name
+            int_marker.description = obj.name
+            int_marker.scale = obj.controls.scale
 
             if isinstance(obj.geometry, Mesh) :
                 control = CreatePrimitiveControl(obj.name, p, 1.0, Marker.MESH_RESOURCE, ids)
@@ -169,7 +187,8 @@ class AffordanceTemplateCreator(object) :
             scale = 1.0
             if obj.controls.scale != None :
                 scale = obj.controls.scale
-            int_marker = CreateInteractiveMarker(self.affordance_template.frame_id, obj.name, scale)
+
+            # int_marker = CreateInteractiveMarker(self.affordance_template.frame_id, obj.name, scale)
             int_marker.controls.append(control)
             int_marker.controls.extend(CreateCustomDOFControls("",
                 obj.controls.xyz[0], obj.controls.xyz[1], obj.controls.xyz[2],
@@ -185,6 +204,82 @@ class AffordanceTemplateCreator(object) :
                 self.affordance_template.parent_map[obj.name] = obj.parent
 
             ids += 1
+
+        # parse end effector waypoints
+        for wp in self.structure.end_effector_waypoints.end_effector_waypoints :
+            print "---------------------"
+            print "\twaypoint: ", wp.end_effector, ".", wp.id
+            print "----------------"
+            print "\tdisplay_object: ", wp.display_object
+            print "----------------"
+            print "\torigin xyz: ", wp.origin.xyz
+            print "\torigin rpy: ", wp.origin.rpy
+            print "----------------"
+            print "\tcontrols xyz: ", wp.controls.xyz
+            print "\tcontrols rpy: ", wp.controls.rpy
+            print "----------------"
+
+        wp_ids = 0
+        for wp in self.structure.end_effector_waypoints.end_effector_waypoints :
+
+            wp_name = str(wp.end_effector) + "." + str(wp.id)
+            p = self.pose_from_origin(wp.origin)
+
+            root_pose = self.affordance_template.marker_pose_offset[wp.display_object]
+            display_pose = getPoseFromFrame(getFrameFromPose(root_pose)*getFrameFromPose(p))
+            int_marker = InteractiveMarker()
+            control = InteractiveMarkerControl()
+
+            int_marker.header.frame_id = self.affordance_template.frame_id
+            int_marker.pose = display_pose
+            int_marker.name = wp_name
+            int_marker.description = wp_name
+            int_marker.scale = wp.controls.scale
+
+            # if isinstance(wp.geometry, Mesh) :
+            #     control = CreatePrimitiveControl(wp.name, p, 1.0, Marker.MESH_RESOURCE, wp_ids)
+            #     control.markers[0].mesh_resource = wp.geometry.filename
+            #     control.markers[0].mesh_use_embedded_materials = True
+
+            control = CreatePrimitiveControl(wp_name, display_pose, 1.0, Marker.SPHERE, wp_ids)
+            control.markers[0].scale.x = .1
+            control.markers[0].scale.y = .1
+            control.markers[0].scale.z = .1
+
+            control.markers[0].color.r = 0
+            control.markers[0].color.g = 1
+            control.markers[0].color.b = 0
+            control.markers[0].color.a = 0.5
+            # if isinstance(wp.geometry, Mesh) :
+            #     control.markers[0].mesh_use_embedded_materials = False
+
+            control.markers[0].header.frame_id = self.affordance_template.frame_id
+            control.markers[0].action = Marker.ADD
+            # print control.markers[0]
+
+            scale = 1.0
+            if wp.controls.scale != None :
+                scale = wp.controls.scale
+
+            # int_marker = CreateInteractiveMarker(self.affordance_template.frame_id, wp.name, scale)
+            int_marker.controls.append(control)
+            int_marker.controls.extend(CreateCustomDOFControls("",
+                wp.controls.xyz[0], wp.controls.xyz[1], wp.controls.xyz[2],
+                wp.controls.rpy[0], wp.controls.rpy[1], wp.controls.rpy[2]))
+
+            self.affordance_template.add_interactive_marker(int_marker)
+            self.server.applyChanges()
+
+            self.affordance_template.marker_map[wp_name] = control.markers[0]
+            self.affordance_template.marker_pose_offset[wp_name] = p
+
+            if not wp.display_object == None :
+                 self.affordance_template.parent_map[wp_name] = wp.display_object
+            else :
+                self.affordance_template.parent_map[wp_name] = self.affordance_template.get_root_object()
+            wp_ids += 1
+
+
 
     def load_from_file(self, filename) :
         self.structure = AffordanceTemplateStructure.from_file(filename)
@@ -213,9 +308,9 @@ class AffordanceTemplateCreator(object) :
             if isinstance(obj.geometry, Box) :
                 print "\tBox size: ", obj.geometry.size
             if isinstance(obj.geometry, Sphere) :
-                print "\tSphere size: ", obj.geometry.size
+                print "\tSphere radius: ", obj.geometry.radius
             if isinstance(obj.geometry, Cylinder) :
-                print "\tCylinder size: ", obj.geometry.size
+                print "\tCylinder size: (", obj.geometry.radius, ", ", obj.geometry.length, ")"
             if isinstance(obj.geometry, Mesh) :
                 print "\tMesh: ", obj.geometry.filename
             if not obj.material == None :
@@ -242,7 +337,7 @@ if __name__ == '__main__':
     rospack = rospkg.RosPack()
     path = rospack.get_path('affordance_template_library')
 
-    server = InteractiveMarkerServer("affrodance_template_server")
+    server = InteractiveMarkerServer("affordance_template_server")
 
     try:
         filename = path + "/templates/test.atdf"
