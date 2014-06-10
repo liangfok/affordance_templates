@@ -139,6 +139,7 @@ class AffordanceTemplate(object) :
 
     def add_interactive_marker(self, marker, callback=None):
         name = marker.name
+        print "Adding interactive marker: ", name
         self.marker_map[name] = marker
         if callback:
             self.callback_map[name] = callback
@@ -350,7 +351,7 @@ class AffordanceTemplateCreator(object) :
             self.affordance_template.add_interactive_marker(int_marker)
             self.server.applyChanges()
 
-            self.affordance_template.marker_pose_offset[wp_name] = p
+            self.affordance_template.marker_pose_offset[wp_name] = display_pose
 
             if not wp.display_object == None :
                  self.affordance_template.parent_map[wp_name] = wp.display_object
