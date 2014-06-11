@@ -19,7 +19,6 @@ from template_markers.template_utilities import *
 import template_markers.atdf_parser
 
 from nasa_robot_teleop.moveit_interface import *
-# from nasa_robot_teleop.marker_helper import *
 from nasa_robot_teleop.kdl_posemath import *
 from nasa_robot_teleop.pose_update_thread import *
 from nasa_robot_teleop.end_effector_helper import *
@@ -37,7 +36,8 @@ class RobotConfig(object) :
         self.end_effector_pose_map = {}
         self.end_effector_link_data = {}
         self.end_effector_markers = {}
-
+        self.frame_id = "world"
+        self.root_offset = geometry_msgs.msg.Pose()
         self.tf_listener = tf.TransformListener()
         self.joint_data = sensor_msgs.msg.JointState()
 
@@ -52,6 +52,18 @@ class RobotConfig(object) :
 
             self.robot_name = self.yaml_config['robot_name']
             self.config_package = str(self.yaml_config['moveit_config_package'])
+            self.frame_id = self.yaml_config['frame_id']
+
+            q = (kdl.Rotation.RPY(self.yaml_config['root_offset'][3],self.yaml_config['root_offset'][4],self.yaml_config['root_offset'][5])).GetQuaternion()
+            self.root_offset.position.x = self.yaml_config['root_offset'][0]
+            self.root_offset.position.y = self.yaml_config['root_offset'][1]
+            self.root_offset.position.z = self.yaml_config['root_offset'][2]
+            self.root_offset.orientation.x = q[0]
+            self.root_offset.orientation.y = q[1]
+            self.root_offset.orientation.z = q[2]
+            self.root_offset.orientation.w = q[3]
+
+            print self.root_offset
             for ee in self.yaml_config['end_effector_map']:
                 self.end_effector_names.append(ee['name'])
                 self.end_effector_name_map[ee['id']] = ee['name']
@@ -87,7 +99,6 @@ class RobotConfig(object) :
                 print "control frame: ", self.moveit_interface.srdf_model.group_end_effectors[g].parent_link
                 rospy.sleep(2)
                 self.end_effector_markers[g] = self.end_effector_link_data[g].get_current_position_marker_array(scale=1.0,color=(1,1,1,0.5))
-                # print self.end_effector_markers[g]
 
         # what do we have?
         # self.moveit_interface.print_basic_info()
@@ -121,6 +132,14 @@ class AffordanceTemplate(object) :
         self.marker_map = {}
         self.callback_map = {}
         self.marker_pose_offset = {}
+        self.display_objects = []
+        self.waypoints = []
+
+        # helper frames
+        self.robotTroot = kdl.Frame()
+        self.rootTobj = {}
+        self.objTwp = {}
+        self.wpTee = {}
 
         # not all templates will have a dynamic reconfigure server
         self.dserver = None
@@ -130,6 +149,8 @@ class AffordanceTemplate(object) :
             rospy.loginfo("AffordanceTemplate::init() -- problem setting robot config")
         else :
             self.robot_config = robot_config
+            self.frame_id = self.robot_config.frame_id
+            self.robotTroot = getFrameFromPose(self.robot_config.root_offset)
 
     def set_root_object(self, name) :
         self.root_object = name
@@ -182,34 +203,165 @@ class AffordanceTemplate(object) :
         if not keep_alive:
             rospy.signal_shutdown("User deleted template.")
 
-    def process_feedback(self, feedback):
-        # print feedback.marker_name
-        for m in self.marker_map.keys() :
-            if m in self.parent_map :
-                if self.parent_map[m] == feedback.marker_name :
-                    rTm = getFrameFromPose(feedback.pose)
-                    T = getFrameFromPose(self.marker_pose_offset[m])
-                    p = getPoseFromFrame(rTm*T)
-                    self.server.setPose(m, p)
-        self.server.applyChanges()
-        if feedback.event_type == InteractiveMarkerFeedback.MOUSE_UP :
-            To = getFrameFromPose(self.marker_pose_offset[feedback.marker_name])
-            T = getFrameFromPose(feedback.pose)
+    def is_parent(self, child, parent) :
+        if not child in self.parent_map :
+            return False
+        elif self.parent_map[child] == None :
+            return False
+        elif self.parent_map[child] == parent:
+            return True
+        else :
+            return self.is_parent(self.parent_map[child], parent)
 
-            if feedback.marker_name in self.parent_map:
-                Tp = getFrameFromPose(self.marker_pose_offset[self.parent_map[feedback.marker_name]])
-                self.marker_pose_offset[feedback.marker_name] = getPoseFromFrame(Tp.Inverse()*T)
+    def get_chain(self, parent, child) :
+        if not self.is_parent(child, parent) :
+            return kdl.Frame()
+        else :
+            print " getting chain from ", parent, " to ", child
+            if parent == self.parent_map[child] :
+                T = self.rootTobj[child]
             else :
-                self.marker_pose_offset[feedback.marker_name] = getPoseFromFrame(T)
+                T = self.get_chain(parent,self.parent_map[child])*self.rootTobj[child]
+            return T
+
+    def get_chain_from_robot(self, child) :
+        return self.get_chain("robot",child)
+
+    def process_feedback(self, feedback):
+        print "\n--------------------------------"
+        print "Process Feedback on marker: ", feedback.marker_name
+        for m in self.marker_map.keys() :
+            if self.is_parent(m, feedback.marker_name) :
+                if m in self.display_objects :
+
+                    #print "------------\n(object) feeback marker: ", feedback.marker_name
+                    #print "------------\nchild: ", m
+
+                    robotTroot_new = getFrameFromPose(feedback.pose)
+                    #print "------------\nrobotTroot_new: "
+                    #print robotTroot_new
+
+                    Tint = self.get_chain(feedback.marker_name,m)
+                    #print "------------\nTint: (", feedback.marker_name, ",", m, ")"
+                    #print Tint
+
+                    T = robotTroot_new*Tint
+                    #print "------------\nT: "
+                    #print T
+
+                    p = getPoseFromFrame(T)
+                    self.server.setPose(m, p)
+
+                if m in self.waypoints :
+
+                    #print "------------\n(waypoint) feedback marker: ", feedback.marker_name
+                    #print "------------\nchild: ", m
+
+                    robotTobj_new = getFrameFromPose(feedback.pose)
+                    #print "------------\nrobotTroot_new: "
+                    #print robotTobj_new
+
+                    Tint = self.get_chain(feedback.marker_name,self.parent_map[m])*self.objTwp[m]#*self.wpTee[m]
+                    #print "------------\nTint: (", feedback.marker_name, ",", m, ")"
+                    #print Tint
+
+                    T = robotTobj_new*Tint
+                    #print "------------\nT: "
+                    #print T
+
+                    p = getPoseFromFrame(T)
+                    self.server.setPose(m, p)
+
+        if feedback.event_type == InteractiveMarkerFeedback.MOUSE_UP :
+
+            print "----------\n"
+            print "----------"
+            print "MOUSE UP [", feedback.marker_name , "]!!!!"
+
+            TInverse = kdl.Frame()
+            Tdelta = kdl.Frame()
+
+            if feedback.marker_name in self.display_objects :
+
+                print "------------\nrootTobj (orig): "
+                print self.rootTobj[feedback.marker_name]
+
+                robotTobj_new = getFrameFromPose(feedback.pose)
+                robotTroot = self.robotTroot
+
+                robotTroot = self.get_chain_from_robot(feedback.marker_name)
+                T = self.robotTroot*robotTroot
+                Tdelta = T.Inverse()*robotTobj_new
+                self.rootTobj[feedback.marker_name] = self.rootTobj[feedback.marker_name]*Tdelta
+
+
+            if feedback.marker_name in self.waypoints :
+
+                rootTobj = self.rootTobj[self.parent_map[feedback.marker_name]]
+
+                print "------------\nobjTwp (orig): "
+                print self.objTwp[feedback.marker_name]
+
+                print "------------\nrootTobj: "
+                print rootTobj
+
+                print "------------\nwpTee: "
+                print self.wpTee[feedback.marker_name]
+
+                # rootTee = rootTobj*self.objTwp[feedback.marker_name]*self.wpTee[feedback.marker_name]
+                # print "------------\n: "
+                # print rootTee
+
+                rootTwp = rootTobj*self.objTwp[feedback.marker_name]
+                print "------------\n: "
+                print rootTwp
+
+                robotTwp_new = getFrameFromPose(feedback.pose)
+                robotTroot = self.get_chain_from_robot(self.parent_map[feedback.marker_name])*self.objTwp[feedback.marker_name]#*self.wpTee[feedback.marker_name]
+                T = self.robotTroot*rootTobj*self.objTwp[feedback.marker_name]
+                TInverse = T.Inverse()
+                Tdelta = T.Inverse()*robotTwp_new
+                self.objTwp[feedback.marker_name] = self.objTwp[feedback.marker_name]*Tdelta
+
+            print "------------\nself.robotTroot: "
+            print self.robotTroot
+
+            print "------------\nrobotTroot: "
+            print robotTroot
+
+            print "------------\nT: "
+            print T
+
+            print "------------\nTInverse: "
+            print TInverse
+
+            print "------------\nTdelta: "
+            print Tdelta
+
+
+            if feedback.marker_name in self.display_objects :
+                print "------------\nrobotTobj_new: "
+                print robotTobj_new
+
+                print "------------\nrootTobj (updated): "
+                print self.rootTobj[feedback.marker_name]
+
+            if feedback.marker_name in self.waypoints :
+                print "------------\nrobotTee_new: "
+                print robotTwp_new
+
+                print "------------\nobjTwp (updated): "
+                print self.objTwp[feedback.marker_name]
+
+        self.server.applyChanges()
 
 
 class AffordanceTemplateCreator(object) :
     def __init__(self,server,robot_config=None) :
         self.structure = None
-        self.affordamce_template = None
+        self.affordance_template = None
         self.robot_config = robot_config
         self.server = server
-
         self.end_effector_link_data = {}
 
     def pose_from_origin(self, origin) :
@@ -239,10 +391,23 @@ class AffordanceTemplateCreator(object) :
         ids = 0
         for obj in self.structure.display_objects.display_objects :
 
+            print "--------------\n--------------\nAdding object: ", obj.name
             if ids == 0:
                 self.affordance_template.set_root_object(obj.name)
+                self.affordance_template.parent_map[obj.name] = "robot"
 
-            p = self.pose_from_origin(obj.origin)
+            robotTfirst_object = self.affordance_template.robotTroot
+            robotTroot = robotTfirst_object # this might be the case if root and first_object are the same
+
+            if not obj.parent == None :
+                self.affordance_template.parent_map[obj.name] = obj.parent
+                robotTroot = robotTroot*self.affordance_template.get_chain_from_robot(obj.parent)
+                print robotTroot
+
+            print "-----------\ngetting final object frame from ", obj.parent, " to new object ", obj.name
+            self.affordance_template.rootTobj[obj.name] = getFrameFromPose(self.pose_from_origin(obj.origin))
+            print self.affordance_template.rootTobj[obj.name]
+            p = getPoseFromFrame(robotTroot*self.affordance_template.rootTobj[obj.name])
 
             int_marker = InteractiveMarker()
             control = InteractiveMarkerControl()
@@ -299,10 +464,9 @@ class AffordanceTemplateCreator(object) :
             self.server.applyChanges()
 
             self.affordance_template.marker_map[obj.name] = control.markers[0]
-            self.affordance_template.marker_pose_offset[obj.name] = p
+            self.affordance_template.marker_pose_offset[obj.name] = self.pose_from_origin(obj.origin)
 
-            if not obj.parent == None :
-                self.affordance_template.parent_map[obj.name] = obj.parent
+            self.affordance_template.display_objects.append(obj.name)
 
             ids += 1
 
@@ -313,10 +477,21 @@ class AffordanceTemplateCreator(object) :
             wp_name = str(wp.end_effector) + "." + str(wp.id)
             ee_name = self.robot_config.end_effector_name_map[int(wp.end_effector)]
 
-            p = self.pose_from_origin(wp.origin)
-            root_pose = self.affordance_template.marker_pose_offset[wp.display_object]
-            ee_pose = self.robot_config.end_effector_pose_map[ee_name]
-            display_pose = getPoseFromFrame(getFrameFromPose(root_pose)*getFrameFromPose(p)*getFrameFromPose(ee_pose))
+            robotTroot = self.affordance_template.robotTroot*self.affordance_template.get_chain_from_robot(wp.display_object)
+            print "End Effector name: ", wp_name, ", display_object: ", wp.display_object
+
+            if not wp.display_object in self.affordance_template.display_objects :
+                rospy.logerr(str("AffordanceTemplateCreator::create_from_structure() -- end-effector display object " + wp.display_object + "not found!"))
+
+
+            wp_pose = self.pose_from_origin(wp.origin)
+            ee_offset = self.robot_config.end_effector_pose_map[ee_name]
+
+            self.affordance_template.objTwp[wp_name] = getFrameFromPose(wp_pose)
+            self.affordance_template.wpTee[wp_name] = getFrameFromPose(ee_offset)
+
+            display_pose = getPoseFromFrame(robotTroot*self.affordance_template.objTwp[wp_name])#*self.affordance_template.wpTee[wp_name])
+
             int_marker = InteractiveMarker()
             control = InteractiveMarkerControl()
 
@@ -332,7 +507,8 @@ class AffordanceTemplateCreator(object) :
             for m in self.robot_config.end_effector_markers[ee_name].markers :
                 ee_m = copy.deepcopy(m)
                 ee_m.header.frame_id = self.affordance_template.frame_id
-                ee_m.pose = getPoseFromFrame(getFrameFromPose(display_pose)*getFrameFromPose(m.pose))
+                ee_m.pose = getPoseFromFrame(getFrameFromPose(display_pose)*self.affordance_template.wpTee[wp_name]*getFrameFromPose(m.pose))
+                # ee_m.pose = getPoseFromFrame(getFrameFromPose(display_pose)*getFrameFromPose(m.pose))
                 ee_m.color.r = .2
                 ee_m.color.g = .5
                 ee_m.color.b = .2
@@ -351,15 +527,14 @@ class AffordanceTemplateCreator(object) :
             self.affordance_template.add_interactive_marker(int_marker)
             self.server.applyChanges()
 
-            self.affordance_template.marker_pose_offset[wp_name] = display_pose
+            # self.affordance_template.marker_pose_offset[wp_name] = display_pose
+            self.affordance_template.waypoints.append(wp_name)
 
             if not wp.display_object == None :
                  self.affordance_template.parent_map[wp_name] = wp.display_object
             else :
                 self.affordance_template.parent_map[wp_name] = self.affordance_template.get_root_object()
             wp_ids += 1
-
-
 
     def load_from_file(self, filename) :
         self.structure = template_markers.atdf_parser.AffordanceTemplateStructure.from_file(filename)
