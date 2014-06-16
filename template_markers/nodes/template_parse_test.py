@@ -22,7 +22,7 @@ if __name__ == '__main__':
 
     server = InteractiveMarkerServer("affordance_template_server")
 
-    template_filename = atl_path + "/templates/test.atdf"
+    template_filename = atl_path + "/templates/wheel.atdf"
     robot_config_filename = tm_path + "/resources/robots/r2.yaml"
 
     try:

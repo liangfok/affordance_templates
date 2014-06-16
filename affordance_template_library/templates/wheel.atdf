@@ -1,0 +1,25 @@
+<?xml version="1.0" ?>
+<affordance_template name="test_template" image="package://affordance_template_library/images/test.jpg">
+
+    <display_objects>
+        <display_object name="wheel">
+            <geometry>
+                <mesh filename="package://affordance_template_library/models/torus.stl" scale="0.3 0.3 0.3"/>
+            </geometry>
+            <origin xyz="0 0 0" rpy="0 1.57 0"/>
+            <controls xyz="1 1 1" rpy="1 1 1" scale="0.3"/>
+        </display_object>
+    </display_objects>
+
+    <end_effector_waypoints>
+        <end_effector_waypoint end_effector="0" id="0" display_object="wheel">
+            <origin  xyz="0.0 0.35 -0.1" rpy="0 -1.57 0"/>
+            <controls xyz="1 1 1" rpy="0 1 1" scale="0.25"/>
+        </end_effector_waypoint>
+        <end_effector_waypoint end_effector="1" id="0" display_object="wheel">
+            <origin xyz="0.0 -0.35 -0.1" rpy="0 -1.57 0"/>
+            <controls xyz="1 1 1" rpy="0 1 1" scale="0.25"/>
+        </end_effector_waypoint>
+    </end_effector_waypoints>
+
+</affordance_template>

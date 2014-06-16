@@ -62,7 +62,7 @@ class AffordanceTemplate(object) :
 
     def add_interactive_marker(self, marker, callback=None):
         name = marker.name
-        print "Adding interactive marker: ", name
+        rospy.loginfo(str("Adding affordance template marker: " + name))
         self.marker_map[name] = marker
         if callback:
             self.callback_map[name] = callback
@@ -119,7 +119,6 @@ class AffordanceTemplate(object) :
         if not self.is_parent(child, parent) :
             return kdl.Frame()
         else :
-            print " getting chain from ", parent, " to ", child
             if parent == self.parent_map[child] :
                 T = self.rootTobj[child]
             else :
@@ -157,7 +156,6 @@ class AffordanceTemplate(object) :
         ids = 0
         for obj in self.structure.display_objects.display_objects :
 
-            print "--------------\n--------------\nAdding object: ", obj.name
             if ids == 0:
                 self.set_root_object(obj.name)
                 self.parent_map[obj.name] = "robot"
@@ -166,16 +164,11 @@ class AffordanceTemplate(object) :
             robotTroot = robotTfirst_object # this might be the case if root and first_object are the same
 
             if not obj.parent == None :
-                print "Parent found, first object in chain: ", obj.name
                 self.parent_map[obj.name] = obj.parent
                 robotTroot = robotTroot*self.get_chain_from_robot(obj.parent)
-                print robotTroot
 
-            print "-----------\ngetting final object frame from ", obj.parent, " to new object ", obj.name
             self.rootTobj[obj.name] = getFrameFromPose(self.pose_from_origin(obj.origin))
-            print self.rootTobj[obj.name]
             p = getPoseFromFrame(robotTroot*self.rootTobj[obj.name])
-            print p
 
             int_marker = InteractiveMarker()
             control = InteractiveMarkerControl()
@@ -198,6 +191,9 @@ class AffordanceTemplate(object) :
                 marker.type = Marker.MESH_RESOURCE
                 marker.mesh_resource = obj.geometry.filename
                 marker.mesh_use_embedded_materials = True
+                marker.scale.x = obj.geometry.scale[0]
+                marker.scale.y = obj.geometry.scale[1]
+                marker.scale.z = obj.geometry.scale[2]
                 # control = CreatePrimitiveControl(obj.name, p, 1.0, Marker.MESH_RESOURCE, ids)
             elif isinstance(obj.geometry, template_markers.atdf_parser.Box) :
                 marker.type = Marker.CUBE
@@ -253,11 +249,9 @@ class AffordanceTemplate(object) :
             ee_name = self.robot_config.end_effector_name_map[int(wp.end_effector)]
 
             robotTroot = self.robotTroot*self.get_chain_from_robot(wp.display_object)
-            print "End Effector name: ", wp_name, ", display_object: ", wp.display_object
 
             if not wp.display_object in self.display_objects :
                 rospy.logerr(str("AffordanceTemplate::create_from_structure() -- end-effector display object " + wp.display_object + "not found!"))
-
 
             wp_pose = self.pose_from_origin(wp.origin)
             ee_offset = self.robot_config.end_effector_pose_map[ee_name]
@@ -265,7 +259,7 @@ class AffordanceTemplate(object) :
             self.objTwp[wp_name] = getFrameFromPose(wp_pose)
             self.wpTee[wp_name] = getFrameFromPose(ee_offset)
 
-            display_pose = getPoseFromFrame(robotTroot*self.objTwp[wp_name])#*self.wpTee[wp_name])
+            display_pose = getPoseFromFrame(robotTroot*self.objTwp[wp_name])
 
             int_marker = InteractiveMarker()
             control = InteractiveMarkerControl()
@@ -283,7 +277,6 @@ class AffordanceTemplate(object) :
                 ee_m = copy.deepcopy(m)
                 ee_m.header.frame_id = self.frame_id
                 ee_m.pose = getPoseFromFrame(getFrameFromPose(display_pose)*self.wpTee[wp_name]*getFrameFromPose(m.pose))
-                # ee_m.pose = getPoseFromFrame(getFrameFromPose(display_pose)*getFrameFromPose(m.pose))
                 ee_m.color.r = .2
                 ee_m.color.g = .5
                 ee_m.color.b = .2
@@ -361,8 +354,8 @@ class AffordanceTemplate(object) :
             print "----------------"
 
     def process_feedback(self, feedback):
-        print "\n--------------------------------"
-        print "Process Feedback on marker: ", feedback.marker_name
+        # print "\n--------------------------------"
+        # print "Process Feedback on marker: ", feedback.marker_name
         for m in self.marker_map.keys() :
             if self.is_parent(m, feedback.marker_name) :
                 if m in self.display_objects :
@@ -407,17 +400,17 @@ class AffordanceTemplate(object) :
 
         if feedback.event_type == InteractiveMarkerFeedback.MOUSE_UP :
 
-            print "----------\n"
-            print "----------"
-            print "MOUSE UP [", feedback.marker_name , "]!!!!"
+            # print "----------\n"
+            # print "----------"
+            # print "MOUSE UP [", feedback.marker_name , "]!!!!"
 
             TInverse = kdl.Frame()
             Tdelta = kdl.Frame()
 
             if feedback.marker_name in self.display_objects :
 
-                print "------------\nrootTobj (orig): "
-                print self.rootTobj[feedback.marker_name]
+                # print "------------\nrootTobj (orig): "
+                # print self.rootTobj[feedback.marker_name]
 
                 robotTobj_new = getFrameFromPose(feedback.pose)
                 robotTroot = self.robotTroot
@@ -432,22 +425,18 @@ class AffordanceTemplate(object) :
 
                 rootTobj = self.rootTobj[self.parent_map[feedback.marker_name]]
 
-                print "------------\nobjTwp (orig): "
-                print self.objTwp[feedback.marker_name]
+                # print "------------\nobjTwp (orig): "
+                # print self.objTwp[feedback.marker_name]
 
-                print "------------\nrootTobj: "
-                print rootTobj
+                # print "------------\nrootTobj: "
+                # print rootTobj
 
-                print "------------\nwpTee: "
-                print self.wpTee[feedback.marker_name]
-
-                # rootTee = rootTobj*self.objTwp[feedback.marker_name]*self.wpTee[feedback.marker_name]
-                # print "------------\n: "
-                # print rootTee
+                # print "------------\nwpTee: "
+                # print self.wpTee[feedback.marker_name]
 
                 rootTwp = rootTobj*self.objTwp[feedback.marker_name]
-                print "------------\n: "
-                print rootTwp
+                # print "------------\n: "
+                # print rootTwp
 
                 robotTwp_new = getFrameFromPose(feedback.pose)
                 robotTroot = self.get_chain_from_robot(self.parent_map[feedback.marker_name])*self.objTwp[feedback.marker_name]#*self.wpTee[feedback.marker_name]
@@ -456,34 +445,35 @@ class AffordanceTemplate(object) :
                 Tdelta = T.Inverse()*robotTwp_new
                 self.objTwp[feedback.marker_name] = self.objTwp[feedback.marker_name]*Tdelta
 
-            print "------------\nself.robotTroot: "
-            print self.robotTroot
+            # print "------------\nself.robotTroot: "
+            # print self.robotTroot
 
-            print "------------\nrobotTroot: "
-            print robotTroot
+            # print "------------\nrobotTroot: "
+            # print robotTroot
 
-            print "------------\nT: "
-            print T
+            # print "------------\nT: "
+            # print T
 
-            print "------------\nTInverse: "
-            print TInverse
+            # print "------------\nTInverse: "
+            # print TInverse
 
-            print "------------\nTdelta: "
-            print Tdelta
+            # print "------------\nTdelta: "
+            # print Tdelta
 
 
-            if feedback.marker_name in self.display_objects :
-                print "------------\nrobotTobj_new: "
-                print robotTobj_new
+            # if feedback.marker_name in self.display_objects :
+            #     print "------------\nrobotTobj_new: "
+            #     print robotTobj_new
 
-                print "------------\nrootTobj (updated): "
-                print self.rootTobj[feedback.marker_name]
+            #     print "------------\nrootTobj (updated): "
+            #     print self.rootTobj[feedback.marker_name]
 
-            if feedback.marker_name in self.waypoints :
-                print "------------\nrobotTee_new: "
-                print robotTwp_new
+            # if feedback.marker_name in self.waypoints :
+            #     print "------------\nrobotTee_new: "
+            #     print robotTwp_new
 
-                print "------------\nobjTwp (updated): "
-                print self.objTwp[feedback.marker_name]
+            #     print "------------\nobjTwp (updated): "
+            #     print self.objTwp[feedback.marker_name]
 
         self.server.applyChanges()
+

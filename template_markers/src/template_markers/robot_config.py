@@ -53,9 +53,6 @@ class RobotConfig(object) :
             self.root_offset.orientation.z = q[2]
             self.root_offset.orientation.w = q[3]
 
-            print "Root Offset:"
-            print self.root_offset
-
             for ee in self.yaml_config['end_effector_map']:
                 self.end_effector_names.append(ee['name'])
                 self.end_effector_name_map[ee['id']] = ee['name']
@@ -87,8 +84,6 @@ class RobotConfig(object) :
             else :
                 self.end_effector_link_data[g] = EndEffectorHelper(self.robot_name, g, self.moveit_interface.srdf_model.group_end_effectors[g].parent_link, self.tf_listener)
                 self.end_effector_link_data[g].populate_data(self.moveit_interface.get_group_links(g), self.moveit_interface.get_urdf_model())
-                print "got end effector markers for: ", g
-                print "control frame: ", self.moveit_interface.srdf_model.group_end_effectors[g].parent_link
                 rospy.sleep(2)
                 self.end_effector_markers[g] = self.end_effector_link_data[g].get_current_position_marker_array(scale=1.0,color=(1,1,1,0.5))
 
