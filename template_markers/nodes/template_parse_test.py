@@ -63,7 +63,9 @@ class RobotConfig(object) :
             self.root_offset.orientation.z = q[2]
             self.root_offset.orientation.w = q[3]
 
+            print "Root Offset:"
             print self.root_offset
+
             for ee in self.yaml_config['end_effector_map']:
                 self.end_effector_names.append(ee['name'])
                 self.end_effector_name_map[ee['id']] = ee['name']
@@ -110,6 +112,7 @@ class RobotConfig(object) :
             print "Robot Config Info: "
             print "============================="
             print " robot name: ", self.yaml_config['robot_name']
+            print " root offset: ", self.yaml_config['root_offset']
             print " moveit_config: ", self.yaml_config['moveit_config_package']
             for ee in self.yaml_config['end_effector_map']:
                 print "\t", "map: ", ee['name'], " --> ", ee['id']
@@ -400,6 +403,7 @@ class AffordanceTemplateCreator(object) :
             robotTroot = robotTfirst_object # this might be the case if root and first_object are the same
 
             if not obj.parent == None :
+                print "Parent found, first object in chain: ", obj.name
                 self.affordance_template.parent_map[obj.name] = obj.parent
                 robotTroot = robotTroot*self.affordance_template.get_chain_from_robot(obj.parent)
                 print robotTroot
@@ -408,9 +412,13 @@ class AffordanceTemplateCreator(object) :
             self.affordance_template.rootTobj[obj.name] = getFrameFromPose(self.pose_from_origin(obj.origin))
             print self.affordance_template.rootTobj[obj.name]
             p = getPoseFromFrame(robotTroot*self.affordance_template.rootTobj[obj.name])
+            print p
 
             int_marker = InteractiveMarker()
             control = InteractiveMarkerControl()
+
+            p0 = geometry_msgs.msg.Pose()
+            p0.orientation.w = 1
 
             int_marker.header.frame_id = self.affordance_template.frame_id
             int_marker.pose = p
@@ -418,25 +426,33 @@ class AffordanceTemplateCreator(object) :
             int_marker.description = obj.name
             int_marker.scale = obj.controls.scale
 
+            control = InteractiveMarkerControl()
+            marker = Marker()
+            marker.ns = obj.name
+            marker.id = ids
+
             if isinstance(obj.geometry, template_markers.atdf_parser.Mesh) :
-                control = CreatePrimitiveControl(obj.name, p, 1.0, Marker.MESH_RESOURCE, ids)
-                control.markers[0].mesh_resource = obj.geometry.filename
-                control.markers[0].mesh_use_embedded_materials = True
+                marker.type = Marker.MESH_RESOURCE
+                marker.mesh_resource = obj.geometry.filename
+                marker.mesh_use_embedded_materials = True
+                # control = CreatePrimitiveControl(obj.name, p, 1.0, Marker.MESH_RESOURCE, ids)
             elif isinstance(obj.geometry, template_markers.atdf_parser.Box) :
-                control = CreatePrimitiveControl(obj.name, p, 1.0, Marker.CUBE, ids)
-                control.markers[0].scale.x = obj.geometry.size[0]
-                control.markers[0].scale.y = obj.geometry.size[1]
-                control.markers[0].scale.z = obj.geometry.size[2]
+                marker.type = Marker.CUBE
+                marker.scale.x = obj.geometry.size[0]
+                marker.scale.y = obj.geometry.size[1]
+                marker.scale.z = obj.geometry.size[2]
             elif isinstance(obj.geometry, template_markers.atdf_parser.Sphere) :
-                control = CreatePrimitiveControl(obj.name, p, 1.0, Marker.SPHERE, ids)
-                control.markers[0].scale.x = obj.geometry.radius
-                control.markers[0].scale.y = obj.geometry.radius
-                control.markers[0].scale.z = obj.geometry.radius
+                marker.type = Marker.SPHERE
+                marker.scale.x = obj.geometry.radius
+                marker.scale.y = obj.geometry.radius
+                marker.scale.z = obj.geometry.radius
             elif isinstance(obj.geometry, template_markers.atdf_parser.Cylinder) :
-                control = CreatePrimitiveControl(obj.name, p, 1.0, Marker.CYLINDER, ids)
-                control.markers[0].scale.x = obj.geometry.radius
-                control.markers[0].scale.y = obj.geometry.radius
-                control.markers[0].scale.z = obj.geometry.length
+                marker.type = Marker.CYLINDER
+                marker.scale.x = obj.geometry.radius
+                marker.scale.y = obj.geometry.radius
+                marker.scale.z = obj.geometry.length
+
+            control.markers.append(marker)
 
             if not obj.material == None :
                 control.markers[0].color.r = obj.material.color.rgba[0]
@@ -445,10 +461,6 @@ class AffordanceTemplateCreator(object) :
                 control.markers[0].color.a = obj.material.color.rgba[3]
                 if isinstance(obj.geometry, template_markers.atdf_parser.Mesh) :
                     control.markers[0].mesh_use_embedded_materials = False
-
-            control.markers[0].header.frame_id = self.affordance_template.frame_id
-            control.markers[0].action = Marker.ADD
-            # print control.markers[0]
 
             scale = 1.0
             if obj.controls.scale != None :

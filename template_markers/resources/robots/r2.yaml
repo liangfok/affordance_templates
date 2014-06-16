@@ -1,7 +1,7 @@
 robot_name: r2
 moveit_config_package: r2_moveit_config
 frame_id: r2/robot_base
-root_offset: [1,0,0,0,0,0]
+root_offset: [1,0,0,3.14,0,0]
 end_effector_map:
   - name: left_hand
     id: 0
