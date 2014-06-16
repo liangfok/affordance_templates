@@ -1,5 +1,4 @@
 import yaml
-import argparse
 import copy
 import PyKDL as kdl
 
@@ -13,6 +12,8 @@ import visualization_msgs.msg
 
 from interactive_markers.interactive_marker_server import *
 from interactive_markers.menu_handler import *
+
+from nasa_robot_teleop.moveit_interface import *
 
 from template_markers.robot_config import *
 from template_markers.template_utilities import *
@@ -444,6 +445,28 @@ class AffordanceTemplate(object) :
                 TInverse = T.Inverse()
                 Tdelta = T.Inverse()*robotTwp_new
                 self.objTwp[feedback.marker_name] = self.objTwp[feedback.marker_name]*Tdelta
+
+
+                pt = geometry_msgs.msg.PoseStamped()
+                pt.header = feedback.header
+                pt.pose = feedback.pose
+
+
+                ee_name = self.robot_config.get_end_effector_name(int(feedback.marker_name.split(".")[0]))
+                manipulator_name = self.robot_config.get_manipulator(ee_name)
+
+                ee_offset = self.robot_config.end_effector_pose_map[ee_name]
+
+                T_goal = getFrameFromPose(pt.pose)
+                T_offset = getFrameFromPose(ee_offset)
+                T = T_goal*T_offset
+                pt.pose = getPoseFromFrame(T)
+
+                print "trying to get moveit path!"
+                self.robot_config.moveit_interface.groups[manipulator_name].clear_pose_targets()
+                self.robot_config.moveit_interface.create_plan_to_target(manipulator_name, pt)
+
+
 
             # print "------------\nself.robotTroot: "
             # print self.robotTroot

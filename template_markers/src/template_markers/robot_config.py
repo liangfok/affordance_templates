@@ -77,6 +77,7 @@ class RobotConfig(object) :
         self.moveit_interface = MoveItInterface(self.robot_name,self.config_package)
         self.root_frame = self.moveit_interface.get_planning_frame()
         self.moveit_ee_groups = self.moveit_interface.srdf_model.get_end_effector_groups()
+        print "RobotConfig::configure -- moveit groups: ", self.moveit_interface.groups
         for g in self.end_effector_names :
             if not g in self.moveit_ee_groups:
                 rospy.logerr("RobotConfig::configure() -- group ", g, " not in moveit end effector groups!")
@@ -86,9 +87,16 @@ class RobotConfig(object) :
                 self.end_effector_link_data[g].populate_data(self.moveit_interface.get_group_links(g), self.moveit_interface.get_urdf_model())
                 rospy.sleep(2)
                 self.end_effector_markers[g] = self.end_effector_link_data[g].get_current_position_marker_array(scale=1.0,color=(1,1,1,0.5))
+                pg = self.moveit_interface.srdf_model.get_end_effector_parent_group(g)
+                if not pg == None :
+                    print "trying to add MoveIt! group: ", pg
+                    self.moveit_interface.add_group(pg, group_type="manipulator")
+                    self.moveit_interface.set_display_mode(pg, "all_points")
+                else :
+                    print "no manipulator group found for end-effector: ", g
 
         # what do we have?
-        # self.moveit_interface.print_basic_info()
+        self.moveit_interface.print_basic_info()
         return True
 
     def print_yaml(self) :
@@ -106,3 +114,9 @@ class RobotConfig(object) :
 
     def joint_state_callback(self, data) :
         self.joint_data = data
+
+    def get_end_effector_name(self, id) :
+        return self.end_effector_name_map[id]
+
+    def get_manipulator(self, ee) :
+        return self.moveit_interface.srdf_model.get_end_effector_parent_group(ee)
