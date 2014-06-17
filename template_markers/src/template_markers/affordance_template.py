@@ -284,6 +284,7 @@ class AffordanceTemplate(object) :
                 ee_m.color.a = .8
                 menu_control.markers.append( ee_m )
 
+
             scale = 1.0
             if wp.controls.scale != None :
                 scale = wp.controls.scale
