@@ -42,6 +42,9 @@ class AffordanceTemplate(object) :
         self.marker_menus = {}
         self.menu_handles = {}
 
+        # control helper stuff
+        self.waypoint_index = {}
+
         # helper frames
         self.robotTroot = kdl.Frame()
         self.rootTobj = {}
@@ -333,6 +336,10 @@ class AffordanceTemplate(object) :
                  self.parent_map[wp_name] = wp.display_object
             else :
                 self.parent_map[wp_name] = self.get_root_object()
+
+            if wp.end_effector not in self.waypoint_index :
+                self.waypoint_index[wp.end_effector] = 0
+
             wp_ids += 1
 
     def setup_object_menu(self, obj) :
