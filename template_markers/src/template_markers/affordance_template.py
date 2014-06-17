@@ -60,12 +60,20 @@ class AffordanceTemplate(object) :
             self.robotTroot = getFrameFromPose(self.robot_config.root_offset)
 
         # set up menu info
-        self.menu_options = []
-        self.menu_options.append(("Stored Poses", False))
-        self.menu_options.append(("Sync To Actual", False))
-        self.menu_options.append(("Execute", False))
-        self.menu_options.append(("Execute On Move", True))
-        self.menu_options.append(("Show Path", True))
+        self.waypoint_menu_options = []
+        self.waypoint_menu_options.append(("Compute Backwards Path", True))
+        self.waypoint_menu_options.append(("Execute On Move", True))
+        self.waypoint_menu_options.append(("Execute", False))
+        self.waypoint_menu_options.append(("Sync To Actual", False))
+        self.waypoint_menu_options.append(("Stored Poses", False))
+
+        self.object_menu_options = []
+        self.object_menu_options.append(("Compute Backwards Path", True))
+        self.object_menu_options.append(("Execute On Move", True))
+        self.object_menu_options.append(("Execute", False))
+        self.object_menu_options.append(("Reset", False))
+        self.object_menu_options.append(("Save as..", False))
+
 
     def set_root_object(self, name) :
         self.root_object = name
@@ -186,6 +194,10 @@ class AffordanceTemplate(object) :
             int_marker = InteractiveMarker()
             control = InteractiveMarkerControl()
 
+            self.marker_menus[obj.name] = MenuHandler()
+            self.setup_object_menu(obj.name)
+            # self.marker_menus[obj.name].setCheckState( self.menu_handles[(group,"Execute On Move")], MenuHandler.CHECKED )
+
             p0 = geometry_msgs.msg.Pose()
             p0.orientation.w = 1
 
@@ -245,6 +257,7 @@ class AffordanceTemplate(object) :
                 obj.controls.rpy[0], obj.controls.rpy[1], obj.controls.rpy[2]))
 
             self.add_interactive_marker(int_marker)
+            self.marker_menus[obj.name].apply( self.server, obj.name )
             self.server.applyChanges()
 
             self.marker_map[obj.name] = control.markers[0]
@@ -287,7 +300,7 @@ class AffordanceTemplate(object) :
             menu_control.interaction_mode = InteractiveMarkerControl.BUTTON
 
             self.marker_menus[wp_name] = MenuHandler()
-            self.setup_stored_pose_menu(wp_name)
+            self.setup_waypoint_menu(wp_name)
             # self.marker_menus[wp_name].setCheckState( self.menu_handles[(group,"Execute On Move")], MenuHandler.CHECKED )
 
             for m in self.robot_config.end_effector_markers[ee_name].markers :
@@ -322,15 +335,25 @@ class AffordanceTemplate(object) :
                 self.parent_map[wp_name] = self.get_root_object()
             wp_ids += 1
 
-    def setup_stored_pose_menu(self, group) :
-        for m,c in self.menu_options :
+    def setup_object_menu(self, obj) :
+        for m,c in self.object_menu_options :
             # if m == "Stored Poses" :
-            #     sub_menu_handle = self.marker_menus[group].insert(m)
-            #     for p in self.moveit_interface.get_stored_state_list(group) :
-            #         self.menu_handles[(group,m,p)] = self.marker_menus[group].insert(p,parent=sub_menu_handle,callback=self.stored_pose_callback)
+            #     sub_menu_handle = self.marker_menus[obj].insert(m)
+            #     for p in self.moveit_interface.get_stored_state_list(obj) :
+            #         self.menu_handles[(obj,m,p)] = self.marker_menus[obj].insert(p,parent=sub_menu_handle,callback=self.stored_pose_callback)
             # else :
-            self.menu_handles[(group,m)] = self.marker_menus[group].insert( m, callback=self.process_feedback )
-            if c : self.marker_menus[group].setCheckState( self.menu_handles[(group,m)], MenuHandler.UNCHECKED )
+            self.menu_handles[(obj,m)] = self.marker_menus[obj].insert( m, callback=self.process_feedback )
+            if c : self.marker_menus[obj].setCheckState( self.menu_handles[(obj,m)], MenuHandler.UNCHECKED )
+
+    def setup_waypoint_menu(self, waypoint) :
+        for m,c in self.waypoint_menu_options :
+            # if m == "Stored Poses" :
+            #     sub_menu_handle = self.marker_menus[waypoint].insert(m)
+            #     for p in self.moveit_interface.get_stored_state_list(waypoint) :
+            #         self.menu_handles[(waypoint,m,p)] = self.marker_menus[waypoint].insert(p,parent=sub_menu_handle,callback=self.stored_pose_callback)
+            # else :
+            self.menu_handles[(waypoint,m)] = self.marker_menus[waypoint].insert( m, callback=self.process_feedback )
+            if c : self.marker_menus[waypoint].setCheckState( self.menu_handles[(waypoint,m)], MenuHandler.UNCHECKED )
 
     def load_from_file(self, filename) :
         self.structure = template_markers.atdf_parser.AffordanceTemplateStructure.from_file(filename)
