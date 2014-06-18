@@ -1,0 +1,11 @@
+robot_name: v1
+moveit_config_package: v1_moveit_config
+frame_id: v1/Pelvis
+root_offset: [0.45,0,0.05,0,0,0]
+end_effector_map:
+  - name: left_hand
+    id: 0
+    pose_offset: [0,0,0,-1.57,0,0]
+  - name: right_hand
+    id: 1
+    pose_offset: [0,0,0,-1.57,0,0]
