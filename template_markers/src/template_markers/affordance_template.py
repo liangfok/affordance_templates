@@ -562,66 +562,55 @@ class AffordanceTemplate(object) :
 
         elif feedback.event_type == InteractiveMarkerFeedback.MENU_SELECT:
 
-            if feedback.marker_name in self.display_objects :
-                print "menu of object not supported yet"
-            else :
+            handle = feedback.menu_entry_id
+            print "--------------"
 
-                print "--------------"
-                print "--------------"
-                print "waypoint menu"
-                ee_name = self.robot_config.get_end_effector_name(int(feedback.marker_name.split(".")[0]))
-                ee_id = int(feedback.marker_name.split(".")[0])
+            if feedback.marker_name in self.display_objects :
+
+                print "object menu"
+                ee_list = self.waypoint_index.keys()
+
+            else :
+                ee_list =[int(feedback.marker_name.split(".")[0])]
                 waypoint_id = int(feedback.marker_name.split(".")[1])
+
+            print ee_list
+            for ee_id in ee_list :
+
+                print "waypoint menu"
+                ee_name = self.robot_config.get_end_effector_name(ee_id)
                 manipulator_name = self.robot_config.get_manipulator(ee_name)
                 ee_offset = self.robot_config.end_effector_pose_map[ee_name]
                 max_idx = self.waypoint_max[ee_id]
-                handle = feedback.menu_entry_id
 
-                print "--"
                 print "ee_name: ", ee_name
                 print "ee_id: ", ee_id
                 print "max wp ", max_idx
-                print "selected waypoint id: ", waypoint_id
+                # print "selected waypoint id: ", waypoint_id
                 print "stored waypoint idx: ", self.waypoint_index[ee_id]
                 print "manipulator_name: ", manipulator_name
 
                 # compute plan idx stuff always for now
-                if self.waypoint_index[ee_id] < 0 : 
+                if self.waypoint_index[ee_id] < 0 :
                     # haven't started yet, so set first waypoint to 0
                     next_path_idx = 0
                 else :
-                    print "computing new point"
                     if self.waypoint_backwards_flag[ee_id] :
-                        print "going backwards"
                         next_path_idx = self.waypoint_index[ee_id]-1 # fix this for backwards path
                         if self.waypoint_loop[ee_id] :
-                            print "looping"
                             if next_path_idx < 0 :
-                                print "need to wrap around"
                                 next_path_idx = max_idx
                         else :
-                            print "not looping"
                             if next_path_idx < 0 :
-                                print "capping idx at 0"
                                 next_path_idx = 0
                     else :
-                        print "going forwards"
                         next_path_idx = self.waypoint_index[ee_id]+1 # fix this for backwards path
-                        print "test 1:, ", self.waypoint_loop
                         if self.waypoint_loop[ee_id] :
-                            print "looping"
                             if  next_path_idx > max_idx :
-                                print "need to wrap around"
                                 next_path_idx = 0
-                            else :
-                                print "2a"
                         else :
-                            print "not looping"
                             if  next_path_idx > max_idx :
-                                print "capping idx at max"
                                 next_path_idx = max_idx
-                            else :
-                                print "2b"
 
                 print "next waypoint id: ", next_path_idx
 
@@ -641,7 +630,7 @@ class AffordanceTemplate(object) :
                         T = T_goal*T_offset
                         pt.pose = getPoseFromFrame(T)
 
-                        self.robot_config.moveit_interface.groups[manipulator_name].clear_pose_targets()
+                        # self.robot_config.moveit_interface.groups[manipulator_name].clear_pose_targets()
 
                         self.robot_config.moveit_interface.create_plan_to_target(manipulator_name, pt)
                         self.waypoint_plan_valid[ee_id] = True
@@ -715,38 +704,5 @@ class AffordanceTemplate(object) :
 
         self.server.applyChanges()
 
-        # if replan_path :
-
-        #     print "Replanning path"
-        #     print self.objTwp.keys()
-
-        #     ee_name = self.robot_config.get_end_effector_name(int(feedback.marker_name.split(".")[0]))
-        #     ee_id = self.robot_config.get_end_effector_name(int(feedback.marker_name.split(".")[1]))
-        #     manipulator_name = self.robot_config.get_manipulator(ee_name)
-        #     ee_offset = self.robot_config.end_effector_pose_map[ee_name]
-
-        #     print "ee_name: ", ee_name
-        #     print "ee_id: ", ee_id
-        #     print "manipulator_name: ", manipulator_name
-        #     self.robot_config.moveit_interface.groups[manipulator_name].clear_pose_targets()
-        #     pose_targets = []
-
-        #     for k in self.objTwp.keys() :
-        #         if self.robot_config.get_end_effector_name(int(k.split(".")[0])) == ee_name :
-        #             # need to make sure things are in the right order, but dont worry about that now
-        #             pt = geometry_msgs.msg.PoseStamped()
-        #             pt.header = self.server.get(k).header
-        #             pt.pose = self.server.get(k).pose
-
-        #             T_goal = getFrameFromPose(pt.pose)
-        #             T_offset = getFrameFromPose(ee_offset)
-        #             T = T_goal*T_offset
-        #             pt.pose = getPoseFromFrame(T)
-
-        #             pose_targets.append(pt.pose)
-        #             print "trying to get moveit path!"
-        #             # self.robot_config.moveit_interface.create_plan_to_target(manipulator_name, pt)
-
-        #     self.robot_config.moveit_interface.create_path_plan(manipulator_name, feedback.header.frame_id, pose_targets)
 
 
