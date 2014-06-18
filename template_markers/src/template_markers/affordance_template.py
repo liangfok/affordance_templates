@@ -48,6 +48,7 @@ class AffordanceTemplate(object) :
         self.waypoint_auto_execute = {}
         self.waypoint_plan_valid = {}
         self.waypoint_loop = {}
+        self.waypoint_max = {}
 
         # helper frames
         self.robotTroot = kdl.Frame()
@@ -71,8 +72,8 @@ class AffordanceTemplate(object) :
         self.waypoint_menu_options.append(("Display Next Path Segment", False))
         self.waypoint_menu_options.append(("Compute Backwards Path", True))
         self.waypoint_menu_options.append(("Execute On Move", True))
-        self.waypoint_menu_options.append(("Loop Path", True))
         self.waypoint_menu_options.append(("Execute", False))
+        self.waypoint_menu_options.append(("Loop Path", True))
         self.waypoint_menu_options.append(("Sync To Actual", False))
         self.waypoint_menu_options.append(("Stored Poses", False))
 
@@ -80,6 +81,7 @@ class AffordanceTemplate(object) :
         self.object_menu_options.append(("Display Next Path Segment", False))
         self.object_menu_options.append(("Compute Backwards Path", True))
         self.object_menu_options.append(("Execute On Move", True))
+        self.object_menu_options.append(("Loop Path", True))
         self.object_menu_options.append(("Execute", False))
         self.object_menu_options.append(("Reset", False))
         self.object_menu_options.append(("Save as..", False))
@@ -351,6 +353,12 @@ class AffordanceTemplate(object) :
                 self.waypoint_backwards_flag[id] = False
                 self.waypoint_auto_execute[id] = False
                 self.waypoint_plan_valid[id] = False
+                self.waypoint_loop[id] = False
+                self.waypoint_max[id] = int(wp.id)
+            else :
+                # set max wp id for this ee
+                if int(wp.id) > self.waypoint_max[id] :
+                    self.waypoint_max[id] = int(wp.id)
 
             wp_ids += 1
 
@@ -566,29 +574,64 @@ class AffordanceTemplate(object) :
                 waypoint_id = int(feedback.marker_name.split(".")[1])
                 manipulator_name = self.robot_config.get_manipulator(ee_name)
                 ee_offset = self.robot_config.end_effector_pose_map[ee_name]
+                max_idx = self.waypoint_max[ee_id]
+                handle = feedback.menu_entry_id
 
                 print "--"
                 print "ee_name: ", ee_name
                 print "ee_id: ", ee_id
+                print "max wp ", max_idx
                 print "selected waypoint id: ", waypoint_id
                 print "stored waypoint idx: ", self.waypoint_index[ee_id]
                 print "manipulator_name: ", manipulator_name
-                self.robot_config.moveit_interface.groups[manipulator_name].clear_pose_targets()
 
+                # compute plan idx stuff always for now
+                if self.waypoint_index[ee_id] < 0 : 
+                    # haven't started yet, so set first waypoint to 0
+                    next_path_idx = 0
+                else :
+                    print "computing new point"
+                    if self.waypoint_backwards_flag[ee_id] :
+                        print "going backwards"
+                        next_path_idx = self.waypoint_index[ee_id]-1 # fix this for backwards path
+                        if self.waypoint_loop[ee_id] :
+                            print "looping"
+                            if next_path_idx < 0 :
+                                print "need to wrap around"
+                                next_path_idx = max_idx
+                        else :
+                            print "not looping"
+                            if next_path_idx < 0 :
+                                print "capping idx at 0"
+                                next_path_idx = 0
+                    else :
+                        print "going forwards"
+                        next_path_idx = self.waypoint_index[ee_id]+1 # fix this for backwards path
+                        print "test 1:, ", self.waypoint_loop
+                        if self.waypoint_loop[ee_id] :
+                            print "looping"
+                            if  next_path_idx > max_idx :
+                                print "need to wrap around"
+                                next_path_idx = 0
+                            else :
+                                print "2a"
+                        else :
+                            print "not looping"
+                            if  next_path_idx > max_idx :
+                                print "capping idx at max"
+                                next_path_idx = max_idx
+                            else :
+                                print "2b"
 
-                handle = feedback.menu_entry_id
+                print "next waypoint id: ", next_path_idx
 
                 if handle == self.menu_handles[(feedback.marker_name,"Display Next Path Segment")] :
-                    if self.waypoint_backwards_flag[ee_id] :
-                        next_path_idx = self.waypoint_index[ee_id]-1 # fix this for backwards path
-                    else :
-                        next_path_idx = self.waypoint_index[ee_id]+1 # fix this for backwards path
                     next_path_str = str(str(ee_id) + "." + str(next_path_idx))
                     if not next_path_str in self.objTwp :
                         rospy.logerr(str("AffordanceTemplate::process_feedback() -- path index[" + str(next_path_str) + "] not found!!"))
                     else :
                         rospy.loginfo(str("AffordanceTemplate::process_feedback() -- computing path to index[" + str(next_path_str) + "]"))
-                        k = str(next_path_str)#self.objTwp[next_path_idx]
+                        k = str(next_path_str)
                         pt = geometry_msgs.msg.PoseStamped()
                         pt.header = self.server.get(k).header
                         pt.pose = self.server.get(k).pose
@@ -598,6 +641,8 @@ class AffordanceTemplate(object) :
                         T = T_goal*T_offset
                         pt.pose = getPoseFromFrame(T)
 
+                        self.robot_config.moveit_interface.groups[manipulator_name].clear_pose_targets()
+
                         self.robot_config.moveit_interface.create_plan_to_target(manipulator_name, pt)
                         self.waypoint_plan_valid[ee_id] = True
 
@@ -606,10 +651,8 @@ class AffordanceTemplate(object) :
                         r = self.robot_config.moveit_interface.execute_plan(manipulator_name)
                         if not r :
                             rospy.logerr(str("RobotTeleop::process_feedback(mouse) -- failed moveit execution for group: " + manipulator_name + ". re-synching..."))
-                        if self.waypoint_backwards_flag[ee_id] :
-                            self.waypoint_index[ee_id] -= 1
-                        else :
-                            self.waypoint_index[ee_id] += 1
+                        self.waypoint_index[ee_id] = next_path_idx
+                        rospy.loginfo(str("setting current waypoint idx: " + str(self.waypoint_index[ee_id])))
                         self.waypoint_plan_valid[ee_id] = False
 
                 if handle == self.menu_handles[(feedback.marker_name,"Compute Backwards Path")] :
