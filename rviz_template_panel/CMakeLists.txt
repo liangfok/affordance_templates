@@ -51,7 +51,7 @@ find_package(catkin REQUIRED COMPONENTS
 ## CATKIN_DEPENDS: catkin_packages dependent projects also need
 ## DEPENDS: system dependencies of this project that dependent projects also need
 catkin_package(
-  INCLUDE_DIRS include
+  #INCLUDE_DIRS include
   LIBRARIES rviz_template_panel
   CATKIN_DEPENDS geometry_msgs interactive_markers roscpp roslib rviz template_server template_server_protobuf visualization_msgs
   DEPENDS system_lib
