@@ -38,6 +38,13 @@ class AffordanceTemplate(object) :
         self.waypoints = []
         self.structure = None
 
+        # menu stuff
+        self.marker_menus = {}
+        self.menu_handles = {}
+
+        # control helper stuff
+        self.waypoint_index = {}
+
         # helper frames
         self.robotTroot = kdl.Frame()
         self.rootTobj = {}
@@ -54,6 +61,22 @@ class AffordanceTemplate(object) :
             self.robot_config = robot_config
             self.frame_id = self.robot_config.frame_id
             self.robotTroot = getFrameFromPose(self.robot_config.root_offset)
+
+        # set up menu info
+        self.waypoint_menu_options = []
+        self.waypoint_menu_options.append(("Compute Backwards Path", True))
+        self.waypoint_menu_options.append(("Execute On Move", True))
+        self.waypoint_menu_options.append(("Execute", False))
+        self.waypoint_menu_options.append(("Sync To Actual", False))
+        self.waypoint_menu_options.append(("Stored Poses", False))
+
+        self.object_menu_options = []
+        self.object_menu_options.append(("Compute Backwards Path", True))
+        self.object_menu_options.append(("Execute On Move", True))
+        self.object_menu_options.append(("Execute", False))
+        self.object_menu_options.append(("Reset", False))
+        self.object_menu_options.append(("Save as..", False))
+
 
     def set_root_object(self, name) :
         self.root_object = name
@@ -174,6 +197,10 @@ class AffordanceTemplate(object) :
             int_marker = InteractiveMarker()
             control = InteractiveMarkerControl()
 
+            self.marker_menus[obj.name] = MenuHandler()
+            self.setup_object_menu(obj.name)
+            # self.marker_menus[obj.name].setCheckState( self.menu_handles[(group,"Execute On Move")], MenuHandler.CHECKED )
+
             p0 = geometry_msgs.msg.Pose()
             p0.orientation.w = 1
 
@@ -233,6 +260,7 @@ class AffordanceTemplate(object) :
                 obj.controls.rpy[0], obj.controls.rpy[1], obj.controls.rpy[2]))
 
             self.add_interactive_marker(int_marker)
+            self.marker_menus[obj.name].apply( self.server, obj.name )
             self.server.applyChanges()
 
             self.marker_map[obj.name] = control.markers[0]
@@ -274,6 +302,10 @@ class AffordanceTemplate(object) :
             menu_control = InteractiveMarkerControl()
             menu_control.interaction_mode = InteractiveMarkerControl.BUTTON
 
+            self.marker_menus[wp_name] = MenuHandler()
+            self.setup_waypoint_menu(wp_name)
+            # self.marker_menus[wp_name].setCheckState( self.menu_handles[(group,"Execute On Move")], MenuHandler.CHECKED )
+
             for m in self.robot_config.end_effector_markers[ee_name].markers :
                 ee_m = copy.deepcopy(m)
                 ee_m.header.frame_id = self.frame_id
@@ -295,6 +327,7 @@ class AffordanceTemplate(object) :
                 wp.controls.rpy[0], wp.controls.rpy[1], wp.controls.rpy[2]))
 
             self.add_interactive_marker(int_marker)
+            self.marker_menus[wp_name].apply( self.server, wp_name )
             self.server.applyChanges()
 
             # self.marker_pose_offset[wp_name] = display_pose
@@ -304,7 +337,31 @@ class AffordanceTemplate(object) :
                  self.parent_map[wp_name] = wp.display_object
             else :
                 self.parent_map[wp_name] = self.get_root_object()
+
+            if wp.end_effector not in self.waypoint_index :
+                self.waypoint_index[wp.end_effector] = 0
+
             wp_ids += 1
+
+    def setup_object_menu(self, obj) :
+        for m,c in self.object_menu_options :
+            # if m == "Stored Poses" :
+            #     sub_menu_handle = self.marker_menus[obj].insert(m)
+            #     for p in self.moveit_interface.get_stored_state_list(obj) :
+            #         self.menu_handles[(obj,m,p)] = self.marker_menus[obj].insert(p,parent=sub_menu_handle,callback=self.stored_pose_callback)
+            # else :
+            self.menu_handles[(obj,m)] = self.marker_menus[obj].insert( m, callback=self.process_feedback )
+            if c : self.marker_menus[obj].setCheckState( self.menu_handles[(obj,m)], MenuHandler.UNCHECKED )
+
+    def setup_waypoint_menu(self, waypoint) :
+        for m,c in self.waypoint_menu_options :
+            # if m == "Stored Poses" :
+            #     sub_menu_handle = self.marker_menus[waypoint].insert(m)
+            #     for p in self.moveit_interface.get_stored_state_list(waypoint) :
+            #         self.menu_handles[(waypoint,m,p)] = self.marker_menus[waypoint].insert(p,parent=sub_menu_handle,callback=self.stored_pose_callback)
+            # else :
+            self.menu_handles[(waypoint,m)] = self.marker_menus[waypoint].insert( m, callback=self.process_feedback )
+            if c : self.marker_menus[waypoint].setCheckState( self.menu_handles[(waypoint,m)], MenuHandler.UNCHECKED )
 
     def load_from_file(self, filename) :
         self.structure = template_markers.atdf_parser.AffordanceTemplateStructure.from_file(filename)
@@ -358,6 +415,8 @@ class AffordanceTemplate(object) :
     def process_feedback(self, feedback):
         # print "\n--------------------------------"
         # print "Process Feedback on marker: ", feedback.marker_name
+
+        replan_path = False
         for m in self.marker_map.keys() :
             if self.is_parent(m, feedback.marker_name) :
                 if m in self.display_objects :
@@ -447,25 +506,7 @@ class AffordanceTemplate(object) :
                 Tdelta = T.Inverse()*robotTwp_new
                 self.objTwp[feedback.marker_name] = self.objTwp[feedback.marker_name]*Tdelta
 
-
-                pt = geometry_msgs.msg.PoseStamped()
-                pt.header = feedback.header
-                pt.pose = feedback.pose
-
-
-                ee_name = self.robot_config.get_end_effector_name(int(feedback.marker_name.split(".")[0]))
-                manipulator_name = self.robot_config.get_manipulator(ee_name)
-
-                ee_offset = self.robot_config.end_effector_pose_map[ee_name]
-
-                T_goal = getFrameFromPose(pt.pose)
-                T_offset = getFrameFromPose(ee_offset)
-                T = T_goal*T_offset
-                pt.pose = getPoseFromFrame(T)
-
-                print "trying to get moveit path!"
-                self.robot_config.moveit_interface.groups[manipulator_name].clear_pose_targets()
-                self.robot_config.moveit_interface.create_plan_to_target(manipulator_name, pt)
+                replan_path = True
 
 
 
@@ -500,4 +541,40 @@ class AffordanceTemplate(object) :
             #     print self.objTwp[feedback.marker_name]
 
         self.server.applyChanges()
+
+
+        if replan_path :
+
+            print "Replanning path"
+            print self.objTwp.keys()
+
+            ee_name = self.robot_config.get_end_effector_name(int(feedback.marker_name.split(".")[0]))
+            ee_id = self.robot_config.get_end_effector_name(int(feedback.marker_name.split(".")[1]))
+            manipulator_name = self.robot_config.get_manipulator(ee_name)
+            ee_offset = self.robot_config.end_effector_pose_map[ee_name]
+
+            print "ee_name: ", ee_name
+            print "ee_id: ", ee_id
+            print "manipulator_name: ", manipulator_name
+            self.robot_config.moveit_interface.groups[manipulator_name].clear_pose_targets()
+            pose_targets = []
+
+            for k in self.objTwp.keys() :
+                if self.robot_config.get_end_effector_name(int(k.split(".")[0])) == ee_name :
+                    # need to make sure things are in the right order, but dont worry about that now
+                    pt = geometry_msgs.msg.PoseStamped()
+                    pt.header = self.server.get(k).header
+                    pt.pose = self.server.get(k).pose
+
+                    T_goal = getFrameFromPose(pt.pose)
+                    T_offset = getFrameFromPose(ee_offset)
+                    T = T_goal*T_offset
+                    pt.pose = getPoseFromFrame(T)
+
+                    pose_targets.append(pt.pose)
+                    print "trying to get moveit path!"
+                    # self.robot_config.moveit_interface.create_plan_to_target(manipulator_name, pt)
+
+            self.robot_config.moveit_interface.create_path_plan(manipulator_name, feedback.header.frame_id, pose_targets)
+
 
