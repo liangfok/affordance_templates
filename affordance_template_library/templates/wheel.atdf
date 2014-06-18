@@ -20,12 +20,20 @@
             <origin  xyz="0.0 0.2 -0.1" rpy="0 -1.57 0"/>
             <controls xyz="1 1 1" rpy="0 1 1" scale="0.25"/>
         </end_effector_waypoint>
+        <end_effector_waypoint end_effector="0" id="2" display_object="wheel">
+            <origin  xyz="0.1 0.17 -0.1" rpy="0 -1.57 -.51"/>
+            <controls xyz="1 1 1" rpy="0 1 1" scale="0.25"/>
+        </end_effector_waypoint>
         <end_effector_waypoint end_effector="1" id="0" display_object="wheel">
             <origin xyz="0.0 -0.3 -0.1" rpy="0 -1.57 0"/>
             <controls xyz="1 1 1" rpy="0 1 1" scale="0.25"/>
         </end_effector_waypoint>
         <end_effector_waypoint end_effector="1" id="1" display_object="wheel">
             <origin xyz="0.0 -0.2 -0.1" rpy="0 -1.57 0"/>
+            <controls xyz="1 1 1" rpy="0 1 1" scale="0.25"/>
+        </end_effector_waypoint>
+        <end_effector_waypoint end_effector="1" id="2" display_object="wheel">
+            <origin  xyz="-0.1 -0.17 -0.1" rpy="0 -1.57 -.51"/>
             <controls xyz="1 1 1" rpy="0 1 1" scale="0.25"/>
         </end_effector_waypoint>
     </end_effector_waypoints>
