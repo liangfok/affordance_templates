@@ -44,6 +44,10 @@ class AffordanceTemplate(object) :
 
         # control helper stuff
         self.waypoint_index = {}
+        self.waypoint_backwards_flag = {}
+        self.waypoint_auto_execute = {}
+        self.waypoint_plan_valid = {}
+        self.waypoint_loop = {}
 
         # helper frames
         self.robotTroot = kdl.Frame()
@@ -64,13 +68,16 @@ class AffordanceTemplate(object) :
 
         # set up menu info
         self.waypoint_menu_options = []
+        self.waypoint_menu_options.append(("Display Next Path Segment", False))
         self.waypoint_menu_options.append(("Compute Backwards Path", True))
         self.waypoint_menu_options.append(("Execute On Move", True))
+        self.waypoint_menu_options.append(("Loop Path", True))
         self.waypoint_menu_options.append(("Execute", False))
         self.waypoint_menu_options.append(("Sync To Actual", False))
         self.waypoint_menu_options.append(("Stored Poses", False))
 
         self.object_menu_options = []
+        self.object_menu_options.append(("Display Next Path Segment", False))
         self.object_menu_options.append(("Compute Backwards Path", True))
         self.object_menu_options.append(("Execute On Move", True))
         self.object_menu_options.append(("Execute", False))
@@ -339,7 +346,11 @@ class AffordanceTemplate(object) :
                 self.parent_map[wp_name] = self.get_root_object()
 
             if wp.end_effector not in self.waypoint_index :
-                self.waypoint_index[wp.end_effector] = 0
+                id = int(wp.end_effector)
+                self.waypoint_index[id] = -1
+                self.waypoint_backwards_flag[id] = False
+                self.waypoint_auto_execute[id] = False
+                self.waypoint_plan_valid[id] = False
 
             wp_ids += 1
 
@@ -540,41 +551,159 @@ class AffordanceTemplate(object) :
             #     print "------------\nobjTwp (updated): "
             #     print self.objTwp[feedback.marker_name]
 
+
+        elif feedback.event_type == InteractiveMarkerFeedback.MENU_SELECT:
+
+            if feedback.marker_name in self.display_objects :
+                print "menu of object not supported yet"
+            else :
+
+                print "--------------"
+                print "--------------"
+                print "waypoint menu"
+                ee_name = self.robot_config.get_end_effector_name(int(feedback.marker_name.split(".")[0]))
+                ee_id = int(feedback.marker_name.split(".")[0])
+                waypoint_id = int(feedback.marker_name.split(".")[1])
+                manipulator_name = self.robot_config.get_manipulator(ee_name)
+                ee_offset = self.robot_config.end_effector_pose_map[ee_name]
+
+                print "--"
+                print "ee_name: ", ee_name
+                print "ee_id: ", ee_id
+                print "selected waypoint id: ", waypoint_id
+                print "stored waypoint idx: ", self.waypoint_index[ee_id]
+                print "manipulator_name: ", manipulator_name
+                self.robot_config.moveit_interface.groups[manipulator_name].clear_pose_targets()
+
+
+                handle = feedback.menu_entry_id
+
+                if handle == self.menu_handles[(feedback.marker_name,"Display Next Path Segment")] :
+                    if self.waypoint_backwards_flag[ee_id] :
+                        next_path_idx = self.waypoint_index[ee_id]-1 # fix this for backwards path
+                    else :
+                        next_path_idx = self.waypoint_index[ee_id]+1 # fix this for backwards path
+                    next_path_str = str(str(ee_id) + "." + str(next_path_idx))
+                    if not next_path_str in self.objTwp :
+                        rospy.logerr(str("AffordanceTemplate::process_feedback() -- path index[" + str(next_path_str) + "] not found!!"))
+                    else :
+                        rospy.loginfo(str("AffordanceTemplate::process_feedback() -- computing path to index[" + str(next_path_str) + "]"))
+                        k = str(next_path_str)#self.objTwp[next_path_idx]
+                        pt = geometry_msgs.msg.PoseStamped()
+                        pt.header = self.server.get(k).header
+                        pt.pose = self.server.get(k).pose
+
+                        T_goal = getFrameFromPose(pt.pose)
+                        T_offset = getFrameFromPose(ee_offset)
+                        T = T_goal*T_offset
+                        pt.pose = getPoseFromFrame(T)
+
+                        self.robot_config.moveit_interface.create_plan_to_target(manipulator_name, pt)
+                        self.waypoint_plan_valid[ee_id] = True
+
+                if handle == self.menu_handles[(feedback.marker_name,"Execute")] :
+                    if self.waypoint_plan_valid[ee_id] :
+                        r = self.robot_config.moveit_interface.execute_plan(manipulator_name)
+                        if not r :
+                            rospy.logerr(str("RobotTeleop::process_feedback(mouse) -- failed moveit execution for group: " + manipulator_name + ". re-synching..."))
+                        if self.waypoint_backwards_flag[ee_id] :
+                            self.waypoint_index[ee_id] -= 1
+                        else :
+                            self.waypoint_index[ee_id] += 1
+                        self.waypoint_plan_valid[ee_id] = False
+
+                if handle == self.menu_handles[(feedback.marker_name,"Compute Backwards Path")] :
+                    state = self.marker_menus[feedback.marker_name].getCheckState( handle )
+                    if state == MenuHandler.CHECKED:
+                        self.marker_menus[feedback.marker_name].setCheckState( handle, MenuHandler.UNCHECKED )
+                        self.waypoint_backwards_flag[ee_id] = False
+                    else :
+                        self.marker_menus[feedback.marker_name].setCheckState( handle, MenuHandler.CHECKED )
+                        self.waypoint_backwards_flag[ee_id] = True
+                    rospy.loginfo(str("AffordanceTemplate::process_feedback() -- setting Backwards Path flag for ee[" + str(ee_id) + "] to " + str(self.waypoint_backwards_flag[ee_id])))
+
+                if handle == self.menu_handles[(feedback.marker_name,"Execute On Move")] :
+                    state = self.marker_menus[feedback.marker_name].getCheckState( handle )
+                    if state == MenuHandler.CHECKED:
+                        self.marker_menus[feedback.marker_name].setCheckState( handle, MenuHandler.UNCHECKED )
+                        self.waypoint_auto_execute[ee_id] = False
+                    else :
+                        self.marker_menus[feedback.marker_name].setCheckState( handle, MenuHandler.CHECKED )
+                        self.waypoint_auto_execute[ee_id] = True
+                    rospy.loginfo(str("AffordanceTemplate::process_feedback() -- setting AutoExecute flag for ee[" + str(ee_id) + "] to " + str(self.waypoint_auto_execute[ee_id])))
+
+                if handle == self.menu_handles[(feedback.marker_name,"Loop Path")] :
+                    state = self.marker_menus[feedback.marker_name].getCheckState( handle )
+                    if state == MenuHandler.CHECKED:
+                        self.marker_menus[feedback.marker_name].setCheckState( handle, MenuHandler.UNCHECKED )
+                        self.waypoint_loop[ee_id] = False
+                    else :
+                        self.marker_menus[feedback.marker_name].setCheckState( handle, MenuHandler.CHECKED )
+                        self.waypoint_loop[ee_id] = True
+                    rospy.loginfo(str("AffordanceTemplate::process_feedback() -- setting Loop flag for ee[" + str(ee_id) + "] to " + str(self.waypoint_loop[ee_id])))
+
+
+                # if feedback.marker_name in self.group_names :
+                #     handle = feedback.menu_entry_id
+                #     if handle == self.menu_handles[(feedback.marker_name,"Sync To Actual")] :
+                #         self.reset_group_marker(feedback.marker_name)
+                #     if handle == self.menu_handles[(feedback.marker_name,"Execute On Move")] :
+                #         state = self.marker_menus[feedback.marker_name].getCheckState( handle )
+                #         if state == MenuHandler.CHECKED:
+                #             self.marker_menus[feedback.marker_name].setCheckState( handle, MenuHandler.UNCHECKED )
+                #             self.auto_execute[feedback.marker_name] = False
+                #         else :
+                #             self.marker_menus[feedback.marker_name].setCheckState( handle, MenuHandler.CHECKED )
+                #             self.auto_execute[feedback.marker_name] = True
+                #     if handle == self.menu_handles[(feedback.marker_name,"Show Path")] :
+                #         state = self.marker_menus[feedback.marker_name].getCheckState( handle )
+                #         if state == MenuHandler.CHECKED:
+                #             self.marker_menus[feedback.marker_name].setCheckState( handle, MenuHandler.UNCHECKED )
+                #             self.moveit_interface.set_display_mode(feedback.marker_name, "last_point")
+                #         else :
+                #             self.marker_menus[feedback.marker_name].setCheckState( handle, MenuHandler.CHECKED )
+                #             self.moveit_interface.set_display_mode(feedback.marker_name, "all_points")
+                #     if handle == self.menu_handles[(feedback.marker_name,"Execute")] :
+                #         r = self.moveit_interface.execute_plan(feedback.marker_name)
+                #         if not r :
+                #             rospy.logerr(str("RobotTeleop::process_feedback(mouse) -- failed moveit execution for group: " + feedback.marker_name + ". re-synching..."))
+
+            self.marker_menus[feedback.marker_name].reApply( self.server )
+
         self.server.applyChanges()
 
+        # if replan_path :
 
-        if replan_path :
+        #     print "Replanning path"
+        #     print self.objTwp.keys()
 
-            print "Replanning path"
-            print self.objTwp.keys()
+        #     ee_name = self.robot_config.get_end_effector_name(int(feedback.marker_name.split(".")[0]))
+        #     ee_id = self.robot_config.get_end_effector_name(int(feedback.marker_name.split(".")[1]))
+        #     manipulator_name = self.robot_config.get_manipulator(ee_name)
+        #     ee_offset = self.robot_config.end_effector_pose_map[ee_name]
 
-            ee_name = self.robot_config.get_end_effector_name(int(feedback.marker_name.split(".")[0]))
-            ee_id = self.robot_config.get_end_effector_name(int(feedback.marker_name.split(".")[1]))
-            manipulator_name = self.robot_config.get_manipulator(ee_name)
-            ee_offset = self.robot_config.end_effector_pose_map[ee_name]
+        #     print "ee_name: ", ee_name
+        #     print "ee_id: ", ee_id
+        #     print "manipulator_name: ", manipulator_name
+        #     self.robot_config.moveit_interface.groups[manipulator_name].clear_pose_targets()
+        #     pose_targets = []
 
-            print "ee_name: ", ee_name
-            print "ee_id: ", ee_id
-            print "manipulator_name: ", manipulator_name
-            self.robot_config.moveit_interface.groups[manipulator_name].clear_pose_targets()
-            pose_targets = []
+        #     for k in self.objTwp.keys() :
+        #         if self.robot_config.get_end_effector_name(int(k.split(".")[0])) == ee_name :
+        #             # need to make sure things are in the right order, but dont worry about that now
+        #             pt = geometry_msgs.msg.PoseStamped()
+        #             pt.header = self.server.get(k).header
+        #             pt.pose = self.server.get(k).pose
 
-            for k in self.objTwp.keys() :
-                if self.robot_config.get_end_effector_name(int(k.split(".")[0])) == ee_name :
-                    # need to make sure things are in the right order, but dont worry about that now
-                    pt = geometry_msgs.msg.PoseStamped()
-                    pt.header = self.server.get(k).header
-                    pt.pose = self.server.get(k).pose
+        #             T_goal = getFrameFromPose(pt.pose)
+        #             T_offset = getFrameFromPose(ee_offset)
+        #             T = T_goal*T_offset
+        #             pt.pose = getPoseFromFrame(T)
 
-                    T_goal = getFrameFromPose(pt.pose)
-                    T_offset = getFrameFromPose(ee_offset)
-                    T = T_goal*T_offset
-                    pt.pose = getPoseFromFrame(T)
+        #             pose_targets.append(pt.pose)
+        #             print "trying to get moveit path!"
+        #             # self.robot_config.moveit_interface.create_plan_to_target(manipulator_name, pt)
 
-                    pose_targets.append(pt.pose)
-                    print "trying to get moveit path!"
-                    # self.robot_config.moveit_interface.create_plan_to_target(manipulator_name, pt)
-
-            self.robot_config.moveit_interface.create_path_plan(manipulator_name, feedback.header.frame_id, pose_targets)
+        #     self.robot_config.moveit_interface.create_path_plan(manipulator_name, feedback.header.frame_id, pose_targets)
 
 
