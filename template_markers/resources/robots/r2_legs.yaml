@@ -1,0 +1,11 @@
+robot_name: r2
+moveit_config_package: r2_fullbody_moveit_config
+frame_id: r2/robot_base
+root_offset: [0.7,0,0.4,3.14,0,0]
+end_effector_map:
+  - name: left_foot
+    id: 0
+    pose_offset: [0.1,0.15,0,1.57,0,0]
+  - name: right_foot
+    id: 1
+    pose_offset: [0.1,-0.15,0.0,-1.57,0,0]

@@ -14,7 +14,7 @@ import template_markers.atdf_parser
 
 if __name__ == '__main__':
 
-    rospy.init_node('v1_wheel_test')
+    rospy.init_node('r2_leg_wheel_test')
 
     rospack = rospkg.RosPack()
     atl_path = rospack.get_path('affordance_template_library')
@@ -23,7 +23,7 @@ if __name__ == '__main__':
     server = InteractiveMarkerServer("affordance_template_server")
 
     template_filename = atl_path + "/templates/wheel.atdf"
-    robot_config_filename = tm_path + "/resources/robots/v1.yaml"
+    robot_config_filename = tm_path + "/resources/robots/r2_legs.yaml"
 
     try:
 

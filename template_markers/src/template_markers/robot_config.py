@@ -59,9 +59,9 @@ class RobotConfig(object) :
                 self.end_effector_id_map[ee['name']] = ee['id']
                 p = geometry_msgs.msg.Pose()
                 q = (kdl.Rotation.RPY(ee['pose_offset'][3],ee['pose_offset'][4],ee['pose_offset'][5])).GetQuaternion()
-                p.position.x = ee['pose_offset'][0]
-                p.position.y = ee['pose_offset'][1]
-                p.position.z = ee['pose_offset'][2]
+                p.position.x = float(ee['pose_offset'][0])
+                p.position.y = float(ee['pose_offset'][1])
+                p.position.z = float(ee['pose_offset'][2])
                 p.orientation.x = q[0]
                 p.orientation.y = q[1]
                 p.orientation.z = q[2]
@@ -83,6 +83,9 @@ class RobotConfig(object) :
                 rospy.logerr("RobotConfig::configure() -- group ", g, " not in moveit end effector groups!")
                 return False
             else :
+
+                # self.end_effector_link_data[g] = EndEffectorHelper(self.robot_name, g, self.moveit_interface.get_control_frame(g), self.tf_listener)
+                print "control frame: ", self.moveit_interface.srdf_model.group_end_effectors[g].parent_link
                 self.end_effector_link_data[g] = EndEffectorHelper(self.robot_name, g, self.moveit_interface.srdf_model.group_end_effectors[g].parent_link, self.tf_listener)
                 self.end_effector_link_data[g].populate_data(self.moveit_interface.get_group_links(g), self.moveit_interface.get_urdf_model())
                 rospy.sleep(2)
