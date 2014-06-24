@@ -35,8 +35,21 @@ class AffordanceTemplate(object) :
         # self.end_effector_link_data = {}
         self.marker_pose_offset = {}
         self.display_objects = []
+
         self.waypoints = []
         self.structure = None
+        self.robot_config = None
+
+        # parameter storage
+        self.object_origin = {}
+        self.object_controls = {}
+        self.object_geometry = {}
+        self.object_material = {}
+
+        self.waypoint_origin = {}
+        self.waypoint_controls = {}
+        self.waypoint_end_effectors = {}
+        self.waypoint_ids = {}
 
         # menu stuff
         self.marker_menus = {}
@@ -64,8 +77,6 @@ class AffordanceTemplate(object) :
             rospy.loginfo("AffordanceTemplate::init() -- problem setting robot config")
         else :
             self.robot_config = robot_config
-            self.frame_id = self.robot_config.frame_id
-            self.robotTroot = getFrameFromPose(self.robot_config.root_offset)
 
         # set up menu info
         self.waypoint_menu_options = []
@@ -116,6 +127,11 @@ class AffordanceTemplate(object) :
                 del self.callback_map[marker_name]
                 return True
         return False
+
+    def remove_all_markers(self) :
+        markers = copy.deepcopy(self.marker_map)
+        for m in markers :
+            self.remove_interactive_marker(m)
 
     def attach_menu_handler(self, marker):
         return self.menu_handler.apply(self.server, marker.name)
@@ -183,10 +199,19 @@ class AffordanceTemplate(object) :
             rospy.logerr("AffordanceTemplate::pose_from_origin() error")
         return p
 
-    def create_from_structure(self) :
+    def load_initial_parameters(self) :
+
+        if self.robot_config == None :
+            return False
 
         if self.structure == None :
             return False
+
+        self.display_objects = []
+        self.waypoints = []
+
+        self.frame_id = self.robot_config.frame_id
+        self.robotTroot = getFrameFromPose(self.robot_config.root_offset)
 
         self.key = self.structure.name + str(self.id)
 
@@ -194,93 +219,22 @@ class AffordanceTemplate(object) :
         ids = 0
         for obj in self.structure.display_objects.display_objects :
 
+            self.display_objects.append(obj.name)
+
             if ids == 0:
                 self.set_root_object(obj.name)
                 self.parent_map[obj.name] = "robot"
 
-            robotTfirst_object = self.robotTroot
-            robotTroot = robotTfirst_object # this might be the case if root and first_object are the same
-
             if not obj.parent == None :
                 self.parent_map[obj.name] = obj.parent
-                robotTroot = robotTroot*self.get_chain_from_robot(obj.parent)
 
             self.rootTobj[obj.name] = getFrameFromPose(self.pose_from_origin(obj.origin))
-            p = getPoseFromFrame(robotTroot*self.rootTobj[obj.name])
-
-            int_marker = InteractiveMarker()
-            control = InteractiveMarkerControl()
-
-            self.marker_menus[obj.name] = MenuHandler()
-            self.setup_object_menu(obj.name)
-            # self.marker_menus[obj.name].setCheckState( self.menu_handles[(group,"Execute On Move")], MenuHandler.CHECKED )
-
-            p0 = geometry_msgs.msg.Pose()
-            p0.orientation.w = 1
-
-            int_marker.header.frame_id = self.frame_id
-            int_marker.pose = p
-            int_marker.name = obj.name
-            int_marker.description = obj.name
-            int_marker.scale = obj.controls.scale
-
-            control = InteractiveMarkerControl()
-            marker = Marker()
-            marker.ns = obj.name
-            marker.id = ids
-
-            if isinstance(obj.geometry, template_markers.atdf_parser.Mesh) :
-                marker.type = Marker.MESH_RESOURCE
-                marker.mesh_resource = obj.geometry.filename
-                marker.mesh_use_embedded_materials = True
-                marker.scale.x = obj.geometry.scale[0]
-                marker.scale.y = obj.geometry.scale[1]
-                marker.scale.z = obj.geometry.scale[2]
-                # control = CreatePrimitiveControl(obj.name, p, 1.0, Marker.MESH_RESOURCE, ids)
-            elif isinstance(obj.geometry, template_markers.atdf_parser.Box) :
-                marker.type = Marker.CUBE
-                marker.scale.x = obj.geometry.size[0]
-                marker.scale.y = obj.geometry.size[1]
-                marker.scale.z = obj.geometry.size[2]
-            elif isinstance(obj.geometry, template_markers.atdf_parser.Sphere) :
-                marker.type = Marker.SPHERE
-                marker.scale.x = obj.geometry.radius
-                marker.scale.y = obj.geometry.radius
-                marker.scale.z = obj.geometry.radius
-            elif isinstance(obj.geometry, template_markers.atdf_parser.Cylinder) :
-                marker.type = Marker.CYLINDER
-                marker.scale.x = obj.geometry.radius
-                marker.scale.y = obj.geometry.radius
-                marker.scale.z = obj.geometry.length
-
-            control.markers.append(marker)
-
-            if not obj.material == None :
-                control.markers[0].color.r = obj.material.color.rgba[0]
-                control.markers[0].color.g = obj.material.color.rgba[1]
-                control.markers[0].color.b = obj.material.color.rgba[2]
-                control.markers[0].color.a = obj.material.color.rgba[3]
-                if isinstance(obj.geometry, template_markers.atdf_parser.Mesh) :
-                    control.markers[0].mesh_use_embedded_materials = False
-
-            scale = 1.0
-            if obj.controls.scale != None :
-                scale = obj.controls.scale
-
-            # int_marker = CreateInteractiveMarker(self.frame_id, obj.name, scale)
-            int_marker.controls.append(control)
-            int_marker.controls.extend(CreateCustomDOFControls("",
-                obj.controls.xyz[0], obj.controls.xyz[1], obj.controls.xyz[2],
-                obj.controls.rpy[0], obj.controls.rpy[1], obj.controls.rpy[2]))
-
-            self.add_interactive_marker(int_marker)
-            self.marker_menus[obj.name].apply( self.server, obj.name )
-            self.server.applyChanges()
-
-            self.marker_map[obj.name] = control.markers[0]
             self.marker_pose_offset[obj.name] = self.pose_from_origin(obj.origin)
 
-            self.display_objects.append(obj.name)
+            self.object_origin[obj.name] = obj.origin
+            self.object_controls[obj.name] = obj.controls
+            self.object_geometry[obj.name] = obj.geometry
+            self.object_material[obj.name] = obj.material
 
             ids += 1
 
@@ -291,7 +245,7 @@ class AffordanceTemplate(object) :
             wp_name = str(wp.end_effector) + "." + str(wp.id)
             ee_name = self.robot_config.end_effector_name_map[int(wp.end_effector)]
 
-            robotTroot = self.robotTroot*self.get_chain_from_robot(wp.display_object)
+            self.waypoints.append(wp_name)
 
             if not wp.display_object in self.display_objects :
                 rospy.logerr(str("AffordanceTemplate::create_from_structure() -- end-effector display object " + wp.display_object + "not found!"))
@@ -302,28 +256,170 @@ class AffordanceTemplate(object) :
             self.objTwp[wp_name] = getFrameFromPose(wp_pose)
             self.wpTee[wp_name] = getFrameFromPose(ee_offset)
 
-            display_pose = getPoseFromFrame(robotTroot*self.objTwp[wp_name])
+            self.waypoint_ids[wp_name] = wp.id
+            self.waypoint_end_effectors[wp_name] = wp.end_effector
+            self.waypoint_origin[wp_name] = wp.origin
+            self.waypoint_controls[wp_name] = wp.controls
+
+            if not wp.display_object == None :
+                 self.parent_map[wp_name] = wp.display_object
+            else :
+                self.parent_map[wp_name] = self.get_root_object()
+
+            if self.waypoint_end_effectors[wp_name] not in self.waypoint_index :
+                id = int(self.waypoint_end_effectors[wp_name])
+                self.waypoint_index[id] = -1
+                self.waypoint_backwards_flag[id] = False
+                self.waypoint_auto_execute[id] = False
+                self.waypoint_plan_valid[id] = False
+                self.waypoint_loop[id] = False
+                self.waypoint_max[id] = int(self.waypoint_ids[wp_name])
+            else :
+                # set max wp_name id for this ee
+                if int(self.waypoint_ids[wp_name]) > self.waypoint_max[id] :
+                    self.waypoint_max[id] = int(self.waypoint_ids[wp_name])
+
+
+            wp_ids += 1
+
+
+    def create_from_parameters(self) :
+
+        self.key = self.structure.name + str(self.id)
+
+        # parse objects
+        ids = 0
+        debug_id = 0
+        for obj in self.display_objects :
+
+            robotTfirst_object = self.robotTroot
+            robotTroot = robotTfirst_object # this might be the case if root and first_object are the same
+
+            if obj in self.parent_map :
+                robotTroot = robotTroot*self.get_chain_from_robot(self.parent_map[obj])
+
+            self.rootTobj[obj] = getFrameFromPose(self.marker_pose_offset[obj])
+            p = getPoseFromFrame(robotTroot*self.rootTobj[obj])
+
+            int_marker = InteractiveMarker()
+            control = InteractiveMarkerControl()
+
+            self.marker_menus[obj] = MenuHandler()
+            self.setup_object_menu(obj)
+
+            p0 = geometry_msgs.msg.Pose()
+            p0.orientation.w = 1
+
+            int_marker.header.frame_id = self.frame_id
+            int_marker.pose = p
+            int_marker.name = obj
+            int_marker.description = obj
+            int_marker.scale = self.object_controls[obj].scale
+
+            control = InteractiveMarkerControl()
+            marker = Marker()
+            marker.ns = obj
+            marker.id = ids
+
+            if isinstance(self.object_geometry[obj], template_markers.atdf_parser.Mesh) :
+                marker.type = Marker.MESH_RESOURCE
+                marker.mesh_resource = self.object_geometry[obj].filename
+                marker.mesh_use_embedded_materials = True
+                marker.scale.x = self.object_geometry[obj].scale[0]
+                marker.scale.y = self.object_geometry[obj].scale[1]
+                marker.scale.z = self.object_geometry[obj].scale[2]
+                # control = CreatePrimitiveControl(obj.name, p, 1.0, Marker.MESH_RESOURCE, ids)
+            elif isinstance(self.object_geometry[obj], template_markers.atdf_parser.Box) :
+                marker.type = Marker.CUBE
+                marker.scale.x = self.object_geometry[obj].size[0]
+                marker.scale.y = self.object_geometry[obj].size[1]
+                marker.scale.z = self.object_geometry[obj].size[2]
+            elif isinstance(self.object_geometry[obj], template_markers.atdf_parser.Sphere) :
+                marker.type = Marker.SPHERE
+                marker.scale.x = self.object_geometry[obj].radius
+                marker.scale.y = self.object_geometry[obj].radius
+                marker.scale.z = self.object_geometry[obj].radius
+            elif isinstance(self.object_geometry[obj], template_markers.atdf_parser.Cylinder) :
+                marker.type = Marker.CYLINDER
+                marker.scale.x = self.object_geometry[obj].radius
+                marker.scale.y = self.object_geometry[obj].radius
+                marker.scale.z = self.object_geometry[obj].length
+
+            control.markers.append(marker)
+
+            if obj in self.object_material :
+                if self.object_material[obj] != None :
+                    control.markers[0].color.r = self.object_material[obj].color.rgba[0]
+                    control.markers[0].color.g = self.object_material[obj].color.rgba[1]
+                    control.markers[0].color.b = self.object_material[obj].color.rgba[2]
+                    control.markers[0].color.a = self.object_material[obj].color.rgba[3]
+                    if isinstance(obj.geometry, template_markers.atdf_parser.Mesh) :
+                        control.markers[0].mesh_use_embedded_materials = False
+
+            scale = 1.0
+            if obj in self.object_controls :
+                scale = self.object_controls[obj]
+
+            # int_marker = CreateInteractiveMarker(self.frame_id, obj.name, scale)
+            int_marker.controls.append(control)
+            int_marker.controls.extend(CreateCustomDOFControls("",
+                self.object_controls[obj].xyz[0], self.object_controls[obj].xyz[1], self.object_controls[obj].xyz[2],
+                self.object_controls[obj].rpy[0], self.object_controls[obj].rpy[1], self.object_controls[obj].rpy[2]))
+
+            self.add_interactive_marker(int_marker)
+            self.marker_menus[obj].apply( self.server, obj )
+            self.server.applyChanges()
+
+            self.marker_map[obj] = control.markers[0]
+            self.marker_pose_offset[obj] = self.pose_from_origin(self.object_origin[obj])
+
+            ids += 1
+
+
+        # parse end effector information
+        wp_ids = 0
+        for wp in self.waypoints :
+
+            ee_name = self.robot_config.end_effector_name_map[int(self.waypoint_end_effectors[wp])]
+
+            robotTroot = self.robotTroot*self.get_chain_from_robot(self.parent_map[wp])
+
+            if not self.parent_map[wp] in self.display_objects :
+                rospy.logerr(str("AffordanceTemplate::create_from_structure() -- end-effector display object " + self.parent_map[wp] + "not found!"))
+
+            display_pose = getPoseFromFrame(robotTroot*self.objTwp[wp])
 
             int_marker = InteractiveMarker()
             control = InteractiveMarkerControl()
 
             int_marker.header.frame_id = self.frame_id
             int_marker.pose = display_pose
-            int_marker.name = wp_name
-            int_marker.description = wp_name
-            int_marker.scale = wp.controls.scale
+            int_marker.name = wp
+            int_marker.description = wp
+            int_marker.scale = self.waypoint_controls[wp].scale
 
             menu_control = InteractiveMarkerControl()
             menu_control.interaction_mode = InteractiveMarkerControl.BUTTON
 
-            self.marker_menus[wp_name] = MenuHandler()
-            self.setup_waypoint_menu(wp_name)
-            # self.marker_menus[wp_name].setCheckState( self.menu_handles[(group,"Execute On Move")], MenuHandler.CHECKED )
+            self.marker_menus[wp] = MenuHandler()
+            self.setup_waypoint_menu(wp)
+
+            id = int(self.waypoint_end_effectors[wp])
+            if self.waypoint_backwards_flag[id] :
+                self.marker_menus[wp].setCheckState( self.menu_handles[(wp,"Compute Backwards Path")], MenuHandler.CHECKED )
+            if self.waypoint_auto_execute[id] :
+                self.marker_menus[wp].setCheckState( self.menu_handles[(wp,"Execute On Move")], MenuHandler.CHECKED )
+            if self.waypoint_loop[id] :
+                self.marker_menus[wp].setCheckState( self.menu_handles[(wp,"Loop Path")], MenuHandler.CHECKED )
+            if self.waypoint_controls_display_on :
+                self.marker_menus[wp].setCheckState( self.menu_handles[(wp,"Hide Controls")], MenuHandler.UNCHECKED )
+            else :
+                self.marker_menus[wp].setCheckState( self.menu_handles[(wp,"Hide Controls")], MenuHandler.CHECKED )
 
             for m in self.robot_config.end_effector_markers[ee_name].markers :
                 ee_m = copy.deepcopy(m)
                 ee_m.header.frame_id = self.frame_id
-                ee_m.pose = getPoseFromFrame(getFrameFromPose(display_pose)*self.wpTee[wp_name]*getFrameFromPose(m.pose))
+                ee_m.pose = getPoseFromFrame(getFrameFromPose(display_pose)*self.wpTee[wp]*getFrameFromPose(m.pose))
                 ee_m.color.r = .2
                 ee_m.color.g = .5
                 ee_m.color.b = .2
@@ -332,66 +428,47 @@ class AffordanceTemplate(object) :
 
 
             scale = 1.0
-            if wp.controls.scale != None :
-                scale = wp.controls.scale
+            if wp in self.waypoint_controls :
+                scale = self.waypoint_controls[wp].scale
 
             int_marker.controls.append(menu_control)
 
             if(self.waypoint_controls_display_on) :
                 int_marker.controls.extend(CreateCustomDOFControls("",
-                    wp.controls.xyz[0], wp.controls.xyz[1], wp.controls.xyz[2],
-                    wp.controls.rpy[0], wp.controls.rpy[1], wp.controls.rpy[2]))
+                    self.waypoint_controls[wp].xyz[0], self.waypoint_controls[wp].xyz[1], self.waypoint_controls[wp].xyz[2],
+                    self.waypoint_controls[wp].rpy[0], self.waypoint_controls[wp].rpy[1], self.waypoint_controls[wp].rpy[2]))
 
             self.add_interactive_marker(int_marker)
-            self.marker_menus[wp_name].apply( self.server, wp_name )
+            self.marker_menus[wp].apply( self.server, wp )
             self.server.applyChanges()
 
-            # self.marker_pose_offset[wp_name] = display_pose
-            self.waypoints.append(wp_name)
-
-            if not wp.display_object == None :
-                 self.parent_map[wp_name] = wp.display_object
-            else :
-                self.parent_map[wp_name] = self.get_root_object()
-
-            if wp.end_effector not in self.waypoint_index :
-                id = int(wp.end_effector)
-                self.waypoint_index[id] = -1
-                self.waypoint_backwards_flag[id] = False
-                self.waypoint_auto_execute[id] = False
-                self.waypoint_plan_valid[id] = False
-                self.waypoint_loop[id] = False
-                self.waypoint_max[id] = int(wp.id)
-            else :
-                # set max wp id for this ee
-                if int(wp.id) > self.waypoint_max[id] :
-                    self.waypoint_max[id] = int(wp.id)
+            # self.marker_pose_offset[wp] = display_pose
 
             wp_ids += 1
 
+
+    def create_from_structure(self) :
+        self.load_initial_parameters()
+        self.create_from_parameters()
+
+
     def setup_object_menu(self, obj) :
         for m,c in self.object_menu_options :
-            # if m == "Stored Poses" :
-            #     sub_menu_handle = self.marker_menus[obj].insert(m)
-            #     for p in self.moveit_interface.get_stored_state_list(obj) :
-            #         self.menu_handles[(obj,m,p)] = self.marker_menus[obj].insert(p,parent=sub_menu_handle,callback=self.stored_pose_callback)
-            # else :
             self.menu_handles[(obj,m)] = self.marker_menus[obj].insert( m, callback=self.process_feedback )
             if c : self.marker_menus[obj].setCheckState( self.menu_handles[(obj,m)], MenuHandler.UNCHECKED )
 
     def setup_waypoint_menu(self, waypoint) :
         for m,c in self.waypoint_menu_options :
-            # if m == "Stored Poses" :
-            #     sub_menu_handle = self.marker_menus[waypoint].insert(m)
-            #     for p in self.moveit_interface.get_stored_state_list(waypoint) :
-            #         self.menu_handles[(waypoint,m,p)] = self.marker_menus[waypoint].insert(p,parent=sub_menu_handle,callback=self.stored_pose_callback)
-            # else :
             self.menu_handles[(waypoint,m)] = self.marker_menus[waypoint].insert( m, callback=self.process_feedback )
             if c : self.marker_menus[waypoint].setCheckState( self.menu_handles[(waypoint,m)], MenuHandler.UNCHECKED )
 
     def load_from_file(self, filename) :
         self.structure = template_markers.atdf_parser.AffordanceTemplateStructure.from_file(filename)
-        self.create_from_structure()
+        # self.create_from_structure()
+
+        self.load_initial_parameters()
+        self.create_from_parameters()
+
         return self.structure
 
     def print_structure(self) :
@@ -442,7 +519,6 @@ class AffordanceTemplate(object) :
         # print "\n--------------------------------"
         # print "Process Feedback on marker: ", feedback.marker_name
 
-        replan_path = False
         for m in self.marker_map.keys() :
             if self.is_parent(m, feedback.marker_name) :
                 if m in self.display_objects :
@@ -464,6 +540,7 @@ class AffordanceTemplate(object) :
 
                     p = getPoseFromFrame(T)
                     self.server.setPose(m, p)
+
 
                 if m in self.waypoints :
 
@@ -500,6 +577,7 @@ class AffordanceTemplate(object) :
                 # print self.rootTobj[feedback.marker_name]
 
                 robotTobj_new = getFrameFromPose(feedback.pose)
+                Tstore = robotTobj_new
                 robotTroot = self.robotTroot
 
                 robotTroot = self.get_chain_from_robot(feedback.marker_name)
@@ -507,6 +585,8 @@ class AffordanceTemplate(object) :
                 Tdelta = T.Inverse()*robotTobj_new
                 self.rootTobj[feedback.marker_name] = self.rootTobj[feedback.marker_name]*Tdelta
 
+                if feedback.marker_name == self.get_root_object() :
+                    self.robotTroot = getFrameFromPose(feedback.pose)*Tdelta*self.rootTobj[feedback.marker_name].Inverse()
 
             if feedback.marker_name in self.waypoints :
 
@@ -532,7 +612,7 @@ class AffordanceTemplate(object) :
                 Tdelta = T.Inverse()*robotTwp_new
                 self.objTwp[feedback.marker_name] = self.objTwp[feedback.marker_name]*Tdelta
 
-                replan_path = True
+                self.waypoint_origin[feedback.marker_name] = self.objTwp[feedback.marker_name]
 
             # print "------------\nself.robotTroot: "
             # print self.robotTroot
@@ -674,11 +754,8 @@ class AffordanceTemplate(object) :
                             T = T_goal*T_offset
                             pt.pose = getPoseFromFrame(T)
                             waypoints.append(pt.pose)
-
-                    # self.robot_config.moveit_interface.groups[manipulator_name].clear_pose_targets()
                     self.robot_config.moveit_interface.create_path_plan(manipulator_name, frame_id, waypoints)
                     self.waypoint_plan_valid[ee_id] = True
-
 
                 if handle == self.menu_handles[(feedback.marker_name,"Execute Next Segment")] :
                     if self.waypoint_plan_valid[ee_id] :
@@ -694,9 +771,6 @@ class AffordanceTemplate(object) :
                         r = self.robot_config.moveit_interface.execute_plan(manipulator_name,from_stored=True)
                         if not r :
                             rospy.logerr(str("RobotTeleop::process_feedback(mouse) -- failed moveit execution for group: " + manipulator_name + ". re-synching..."))
-
-
-
                         rospy.loginfo(str("setting current waypoint idx: " + str(self.waypoint_index[ee_id])))
                         self.waypoint_plan_valid[ee_id] = False
 
@@ -731,6 +805,10 @@ class AffordanceTemplate(object) :
                         else :
                             self.marker_menus[feedback.marker_name].setCheckState( handle, MenuHandler.CHECKED )
                             self.waypoint_controls_display_on = False
+
+                        self.remove_all_markers()
+                        self.create_from_parameters()
+
                         rospy.loginfo(str("AffordanceTemplate::process_feedback() -- setting Hide Controls flag to " + str(self.waypoint_controls_display_on)))
 
                     if handle == self.menu_handles[(feedback.marker_name,"Loop Path")] :
@@ -742,40 +820,6 @@ class AffordanceTemplate(object) :
                             self.marker_menus[feedback.marker_name].setCheckState( handle, MenuHandler.CHECKED )
                             self.waypoint_loop[ee_id] = True
                         rospy.loginfo(str("AffordanceTemplate::process_feedback() -- setting Loop flag for ee[" + str(ee_id) + "] to " + str(self.waypoint_loop[ee_id])))
-
-
-                # if feedback.marker_name in self.group_names :
-                #     handle = feedback.menu_entry_id
-                #     if handle == self.menu_handles[(feedback.marker_name,"Sync To Actual")] :
-                #         self.reset_group_marker(feedback.marker_name)
-                #     if handle == self.menu_handles[(feedback.marker_name,"Execute On Move")] :
-                #         state = self.marker_menus[feedback.marker_name].getCheckState( handle )
-                #         if state == MenuHandler.CHECKED:
-                #             self.marker_menus[feedback.marker_name].setCheckState( handle, MenuHandler.UNCHECKED )
-                #             self.auto_execute[feedback.marker_name] = False
-                #         else :
-                #             self.marker_menus[feedback.marker_name].setCheckState( handle, MenuHandler.CHECKED )
-                #             self.auto_execute[feedback.marker_name] = True
-                #     if handle == self.menu_handles[(feedback.marker_name,"Show Path")] :
-                #         state = self.marker_menus[feedback.marker_name].getCheckState( handle )
-                #         if state == MenuHandler.CHECKED:
-                #             self.marker_menus[feedback.marker_name].setCheckState( handle, MenuHandler.UNCHECKED )
-                #             self.moveit_interface.set_display_mode(feedback.marker_name, "last_point")
-                #         else :
-                #             self.marker_menus[feedback.marker_name].setCheckState( handle, MenuHandler.CHECKED )
-                #             self.moveit_interface.set_display_mode(feedback.marker_name, "all_points")
-                #     if handle == self.menu_handles[(feedback.marker_name,"Execute")] :
-                #         r = self.moveit_interface.execute_plan(feedback.marker_name)
-                #         if not r :
-                #             rospy.logerr(str("RobotTeleop::process_feedback(mouse) -- failed moveit execution for group: " + feedback.marker_name + ". re-synching..."))
-
-                print "end of process feedback"
-
-            # if handle == self.menu_handles[(feedback.marker_name,"Execute")] :
-            #     r = self.robot_config.moveit_interface.execute_all_valid_plans(wait=False)
-            #     if not r :
-            #         rospy.logerr(str("RobotTeleop::process_feedback() -- failed moveit execution for groups"))
-
 
             self.marker_menus[feedback.marker_name].reApply( self.server )
 
