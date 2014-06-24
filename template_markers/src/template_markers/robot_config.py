@@ -176,7 +176,6 @@ class RobotConfig(object) :
                 self.end_effector_link_data[g] = EndEffectorHelper(self.robot_name, g, self.moveit_interface.srdf_model.group_end_effectors[g].parent_link, self.tf_listener)
                 self.end_effector_link_data[g].populate_data(self.moveit_interface.get_group_links(g), self.moveit_interface.get_urdf_model())
                 rospy.sleep(2)
-                print "g: ", g
                 self.end_effector_markers[g] = self.end_effector_link_data[g].get_current_position_marker_array(scale=1.0,color=(1,1,1,0.5))
                 pg = self.moveit_interface.srdf_model.get_end_effector_parent_group(g)
                 if not pg == None :
