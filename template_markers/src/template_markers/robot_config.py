@@ -13,6 +13,62 @@ from nasa_robot_teleop.kdl_posemath import *
 from nasa_robot_teleop.pose_update_thread import *
 from nasa_robot_teleop.end_effector_helper import *
 
+# class MoveItInterfaceThread(threading.Thread) :
+#     def __init__(self, robot_name, config_pacakge, manipulator_group) :
+#         super(MoveItInterfaceThread,self).__init__()
+#         self.mutex = threading.Lock()
+
+#         self.robot_name = robot_name
+#         self.config_package = config_package
+#         self.manipulator_group = manipulator_group
+
+#         self.moveit_interface = MoveItInterface(self.robot_name,self.config_package)
+#         self.root_frame = self.moveit_interface.get_planning_frame()
+#         self.moveit_ee_groups = self.moveit_interface.srdf_model.get_end_effector_groups()
+#         selfparent_group = self.moveit_interface.srdf_model.get_end_effector_parent_group(g)
+
+#     def run(self) :
+#         while True :
+#             self.mutex.acquire()
+#             try :
+#                 try :
+#                     rospy.sleep(0.1)
+#                 except :
+#                     rospy.logdebug("MoveItInterfaceThread::run() -- could not update thread")
+#             finally :
+#                 self.mutex.release()
+
+#             rospy.sleep(0.1)
+
+#     def get_end_effector_groups(self) :
+#         return self.moveit_interface.srdf_model.get_end_effector_groups()
+
+#     def get_groups(self) :
+#         return self.moveit_interface.groups
+
+#     def get_urdf_model(self) :
+#         return self.moveit_interface.get_urdf_model()
+
+#     def get_parent_link(self, g) :
+#         if g in self.moveit_interface.srdf_model.group_end_effectors:
+#             return self.moveit_interface.srdf_model.group_end_effectors[g].parent_link
+#         else :
+#             return ""
+
+#     def get_group_links(self, g) :
+#         return self.moveit_interface.get_group_links(g)
+
+#     def get_end_effector_parent_group(self, g) :
+#         return self.moveit_interface.srdf_model.get_end_effector_parent_group(g)
+
+#     def add_manipulator_group(self, g) :
+#         self.moveit_interface.add_group(g, group_type="manipulator")
+#         self.moveit_interface.set_display_mode(g, "all_points")
+
+#     def print_basic_info(self) :
+#         self.moveit_interface.print_basic_info()
+
+
 class RobotConfig(object) :
     def __init__(self) :
 
@@ -73,11 +129,42 @@ class RobotConfig(object) :
             rospy.logerr("RobotConfig::load_from_file() -- error opening config file")
             return False
 
+    # def configure(self) :
+    #     self.moveit_interface = MoveItInterface(self.robot_name,self.config_package)
+    #     self.root_frame = self.moveit_interface.get_planning_frame()
+    #     self.moveit_ee_groups = self.moveit_interface.srdf_model.get_end_effector_groups()
+    #     print "RobotConfig::configure -- moveit groups: ", self.moveit_interface.groups
+    #     for g in self.end_effector_names :
+    #         if not g in self.moveit_ee_groups:
+    #             rospy.logerr("RobotConfig::configure() -- group ", g, " not in moveit end effector groups!")
+    #             return False
+    #         else :
+
+    #             # self.end_effector_link_data[g] = EndEffectorHelper(self.robot_name, g, self.moveit_interface.get_control_frame(g), self.tf_listener)
+    #             print "control frame: ", self.moveit_interface.srdf_model.group_end_effectors[g].parent_link
+    #             self.end_effector_link_data[g] = EndEffectorHelper(self.robot_name, g, self.moveit_interface.srdf_model.group_end_effectors[g].parent_link, self.tf_listener)
+    #             self.end_effector_link_data[g].populate_data(self.moveit_interface.get_group_links(g), self.moveit_interface.get_urdf_model())
+    #             rospy.sleep(2)
+    #             self.end_effector_markers[g] = self.end_effector_link_data[g].get_current_position_marker_array(scale=1.0,color=(1,1,1,0.5))
+    #             pg = self.moveit_interface.srdf_model.get_end_effector_parent_group(g)
+    #             if not pg == None :
+    #                 print "trying to add MoveIt! group: ", pg
+    #                 self.moveit_interface.add_group(pg, group_type="manipulator")
+    #                 self.moveit_interface.set_display_mode(pg, "all_points")
+    #             else :
+    #                 print "no manipulator group found for end-effector: ", g
+
+    #     # what do we have?
+    #     self.moveit_interface.print_basic_info()
+    #     return True
+
     def configure(self) :
+        # self.moveit_interface_threads = {}
         self.moveit_interface = MoveItInterface(self.robot_name,self.config_package)
         self.root_frame = self.moveit_interface.get_planning_frame()
         self.moveit_ee_groups = self.moveit_interface.srdf_model.get_end_effector_groups()
         print "RobotConfig::configure -- moveit groups: ", self.moveit_interface.groups
+        print "RobotConfig::configure -- end_effector_names: ",self.end_effector_names
         for g in self.end_effector_names :
             if not g in self.moveit_ee_groups:
                 rospy.logerr("RobotConfig::configure() -- group ", g, " not in moveit end effector groups!")
@@ -89,12 +176,14 @@ class RobotConfig(object) :
                 self.end_effector_link_data[g] = EndEffectorHelper(self.robot_name, g, self.moveit_interface.srdf_model.group_end_effectors[g].parent_link, self.tf_listener)
                 self.end_effector_link_data[g].populate_data(self.moveit_interface.get_group_links(g), self.moveit_interface.get_urdf_model())
                 rospy.sleep(2)
+                print "g: ", g
                 self.end_effector_markers[g] = self.end_effector_link_data[g].get_current_position_marker_array(scale=1.0,color=(1,1,1,0.5))
                 pg = self.moveit_interface.srdf_model.get_end_effector_parent_group(g)
                 if not pg == None :
                     print "trying to add MoveIt! group: ", pg
                     self.moveit_interface.add_group(pg, group_type="manipulator")
                     self.moveit_interface.set_display_mode(pg, "all_points")
+                    # self.moveit_interface_threads[pg] = MoveItInterfaceThread(self.robot_name,self.config_package, g)
                 else :
                     print "no manipulator group found for end-effector: ", g
 
@@ -123,3 +212,6 @@ class RobotConfig(object) :
 
     def get_manipulator(self, ee) :
         return self.moveit_interface.srdf_model.get_end_effector_parent_group(ee)
+
+
+
