@@ -714,7 +714,6 @@ class AffordanceTemplate(object) :
                                 next_path_idx = max_idx
 
                 print "next waypoint id: ", next_path_idx
-
                 if handle == self.menu_handles[(feedback.marker_name,"Display Next Path Segment")] :
                     next_path_str = str(str(ee_id) + "." + str(next_path_idx))
                     if not next_path_str in self.objTwp :
@@ -748,7 +747,6 @@ class AffordanceTemplate(object) :
                     if self.waypoint_backwards_flag[ee_id] :
                         r.reverse()
 
-                    print "range: ", r
                     for idx in r :
                         next_path_str = str(str(ee_id) + "." + str(idx))
                         if not next_path_str in self.objTwp :
@@ -796,18 +794,19 @@ class AffordanceTemplate(object) :
                         self.waypoint_backwards_flag[ee_id] = True
                     rospy.loginfo(str("AffordanceTemplate::process_feedback() -- setting Backwards Path flag for ee[" + str(ee_id) + "] to " + str(self.waypoint_backwards_flag[ee_id])))
 
-                if handle == self.menu_handles[(feedback.marker_name,"Execute On Move")] :
-                    state = self.marker_menus[feedback.marker_name].getCheckState( handle )
-                    if state == MenuHandler.CHECKED:
-                        self.marker_menus[feedback.marker_name].setCheckState( handle, MenuHandler.UNCHECKED )
-                        self.waypoint_auto_execute[ee_id] = False
-                    else :
-                        self.marker_menus[feedback.marker_name].setCheckState( handle, MenuHandler.CHECKED )
-                        self.waypoint_auto_execute[ee_id] = True
-                    rospy.loginfo(str("AffordanceTemplate::process_feedback() -- setting AutoExecute flag for ee[" + str(ee_id) + "] to " + str(self.waypoint_auto_execute[ee_id])))
+                # if handle == self.menu_handles[(feedback.marker_name,"Execute On Move")] :
+                #     state = self.marker_menus[feedback.marker_name].getCheckState( handle )
+                #     if state == MenuHandler.CHECKED:
+                #         self.marker_menus[feedback.marker_name].setCheckState( handle, MenuHandler.UNCHECKED )
+                #         self.waypoint_auto_execute[ee_id] = False
+                #     else :
+                #         self.marker_menus[feedback.marker_name].setCheckState( handle, MenuHandler.CHECKED )
+                #         self.waypoint_auto_execute[ee_id] = True
+                #     rospy.loginfo(str("AffordanceTemplate::process_feedback() -- setting AutoExecute flag for ee[" + str(ee_id) + "] to " + str(self.waypoint_auto_execute[ee_id])))
 
                 # waypoint specific menu options
                 if not feedback.marker_name in self.display_objects :
+
 
                     if handle == self.menu_handles[(feedback.marker_name,"Hide Controls")] :
                         state = self.marker_menus[feedback.marker_name].getCheckState( handle )
@@ -822,6 +821,8 @@ class AffordanceTemplate(object) :
                         self.create_from_parameters()
 
                         rospy.loginfo(str("AffordanceTemplate::process_feedback() -- setting Hide Controls flag to " + str(self.waypoint_controls_display_on)))
+
+
 
                     if handle == self.menu_handles[(feedback.marker_name,"Loop Path")] :
                         state = self.marker_menus[feedback.marker_name].getCheckState( handle )
