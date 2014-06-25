@@ -32,7 +32,6 @@ class AffordanceTemplate(object) :
         self.parent_map = {}
         self.marker_map = {}
         self.callback_map = {}
-        # self.end_effector_link_data = {}
         self.marker_pose_offset = {}
         self.display_objects = []
 
@@ -403,6 +402,7 @@ class AffordanceTemplate(object) :
 
             self.marker_menus[wp] = MenuHandler()
             self.setup_waypoint_menu(wp)
+            self.setup_stored_pose_menu(wp,ee_name)
 
             id = int(self.waypoint_end_effectors[wp])
             if self.waypoint_backwards_flag[id] :
@@ -462,13 +462,17 @@ class AffordanceTemplate(object) :
             self.menu_handles[(waypoint,m)] = self.marker_menus[waypoint].insert( m, callback=self.process_feedback )
             if c : self.marker_menus[waypoint].setCheckState( self.menu_handles[(waypoint,m)], MenuHandler.UNCHECKED )
 
+    def setup_stored_pose_menu(self, waypoint, group) :
+        for m,c in self.waypoint_menu_options :
+            if m == "Stored Poses" :
+                sub_menu_handle = self.marker_menus[waypoint].insert(m)
+                for p in self.robot_config.moveit_interface.get_stored_state_list(group) :
+                    self.menu_handles[(waypoint,m,p)] = self.marker_menus[waypoint].insert(p,parent=sub_menu_handle,callback=self.stored_pose_callback)
+
     def load_from_file(self, filename) :
         self.structure = template_markers.atdf_parser.AffordanceTemplateStructure.from_file(filename)
-        # self.create_from_structure()
-
         self.load_initial_parameters()
         self.create_from_parameters()
-
         return self.structure
 
     def print_structure(self) :
@@ -721,8 +725,10 @@ class AffordanceTemplate(object) :
                         T = T_goal*T_offset
                         pt.pose = getPoseFromFrame(T)
 
-                        # self.robot_config.moveit_interface.groups[manipulator_name].clear_pose_targets()
+                        self.robot_config.moveit_interface.groups[manipulator_name].clear_pose_targets()
+                        print "computing"
                         self.robot_config.moveit_interface.create_plan_to_target(manipulator_name, pt)
+                        print "done computing"
                         self.waypoint_plan_valid[ee_id] = True
 
                 if handle == self.menu_handles[(feedback.marker_name,"Display Full Path")] :
@@ -825,5 +831,23 @@ class AffordanceTemplate(object) :
 
         self.server.applyChanges()
 
-
-
+    def stored_pose_callback(self, feedback) :
+        ee_id =int(feedback.marker_name.split(".")[0])
+        ee_name = self.robot_config.get_end_effector_name(ee_id)
+        for p in self.robot_config.moveit_interface.get_stored_state_list(ee_name) :
+            if self.menu_handles[(feedback.marker_name,"Stored Poses",p)] == feedback.menu_entry_id :
+                print ee_name
+                print self.robot_config.stored_poses[ee_name][p]
+                self.robot_config.moveit_interface.create_joint_plan_to_target(ee_name, self.robot_config.stored_poses[ee_name][p])
+                r = self.robot_config.moveit_interface.execute_plan(ee_name)
+                if not r : rospy.logerr(str("RobotTeleop::process_feedback(pose) -- failed moveit execution for group: " + ee_name + ". re-synching..."))
+                # if self.waypoint_auto_execute[ee_id] :
+                #     self.robot_config.moveit_interface.create_joint_plan_to_target(ee_name, self.robot_config.stored_poses[ee_name][p])
+                #     r = self.robot_config.moveit_interface.execute_plan(ee_name)
+                #     if not r : rospy.logerr(str("RobotTeleop::process_feedback(pose) -- failed moveit execution for group: " + ee_name + ". re-synching..."))
+                # else :
+                #     self.robot_config.moveit_interface.groups[ee_name].clear_pose_targets()
+                #     self.robot_config.moveit_interface.create_joint_plan_to_target(ee_name, self.robot_config.stored_poses[ee_name][p])
+                # if self.robot_config.moveit_interface.get_group_type(ee_name) == "manipulator" :
+                #     rospy.sleep(3)
+                #     # self.reset_group_marker(feedback.marker_name)

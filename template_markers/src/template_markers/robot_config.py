@@ -86,6 +86,7 @@ class RobotConfig(object) :
         self.root_offset = geometry_msgs.msg.Pose()
         self.tf_listener = tf.TransformListener()
         self.joint_data = sensor_msgs.msg.JointState()
+        self.stored_poses = {}
 
         rospy.Subscriber("/joint_states", sensor_msgs.msg.JointState, self.joint_state_callback)
 
@@ -185,6 +186,11 @@ class RobotConfig(object) :
                     # self.moveit_interface_threads[pg] = MoveItInterfaceThread(self.robot_name,self.config_package, g)
                 else :
                     print "no manipulator group found for end-effector: ", g
+
+            self.stored_poses[g] = {}
+            for state_name in self.moveit_interface.get_stored_state_list(g) :
+                rospy.loginfo(str("RobotConfig::configure() adding stored pose \'" + state_name + "\' to group \'" + g + "\'"))
+                self.stored_poses[g][state_name] = self.moveit_interface.get_stored_group_state(g, state_name)
 
         # what do we have?
         self.moveit_interface.print_basic_info()
