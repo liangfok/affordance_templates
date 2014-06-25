@@ -82,19 +82,20 @@ class AffordanceTemplate(object) :
         self.waypoint_menu_options.append(("Display Next Path Segment", False))
         self.waypoint_menu_options.append(("Display Full Path", False))
         self.waypoint_menu_options.append(("Compute Backwards Path", True))
-        self.waypoint_menu_options.append(("Execute On Move", True))
+        # self.waypoint_menu_options.append(("Execute On Move", True))
         self.waypoint_menu_options.append(("Execute Next Segment", False))
         self.waypoint_menu_options.append(("Execute Full Path", False))
         self.waypoint_menu_options.append(("Loop Path", True))
         self.waypoint_menu_options.append(("Sync To Actual", False))
-        self.waypoint_menu_options.append(("Stored Poses", False))
+        self.waypoint_menu_options.append(("Manipulator Stored Poses", False))
+        self.waypoint_menu_options.append(("End-Effector Stored Poses", False))
         self.waypoint_menu_options.append(("Hide Controls", True))
 
         self.object_menu_options = []
         self.object_menu_options.append(("Display Next Path Segment", False))
         self.object_menu_options.append(("Display Full Path", False))
         self.object_menu_options.append(("Compute Backwards Path", True))
-        self.object_menu_options.append(("Execute On Move", True))
+        # self.object_menu_options.append(("Execute On Move", True))
         # self.object_menu_options.append(("Loop Path", True))
         self.object_menu_options.append(("Execute Next Segment", False))
         self.object_menu_options.append(("Execute Full Path", False))
@@ -402,7 +403,7 @@ class AffordanceTemplate(object) :
 
             self.marker_menus[wp] = MenuHandler()
             self.setup_waypoint_menu(wp)
-            self.setup_stored_pose_menu(wp,ee_name)
+            self.setup_stored_pose_menus(wp,ee_name)
 
             id = int(self.waypoint_end_effectors[wp])
             if self.waypoint_backwards_flag[id] :
@@ -462,9 +463,14 @@ class AffordanceTemplate(object) :
             self.menu_handles[(waypoint,m)] = self.marker_menus[waypoint].insert( m, callback=self.process_feedback )
             if c : self.marker_menus[waypoint].setCheckState( self.menu_handles[(waypoint,m)], MenuHandler.UNCHECKED )
 
-    def setup_stored_pose_menu(self, waypoint, group) :
+    def setup_stored_pose_menus(self, waypoint, group) :
         for m,c in self.waypoint_menu_options :
-            if m == "Stored Poses" :
+            if m == "Manipulator Stored Poses" :
+                sub_menu_handle = self.marker_menus[waypoint].insert(m)
+                parent_group = self.robot_config.moveit_interface.srdf_model.get_end_effector_parent_group(group)
+                for p in self.robot_config.moveit_interface.get_stored_state_list(parent_group) :
+                    self.menu_handles[(waypoint,m,p)] = self.marker_menus[waypoint].insert(p,parent=sub_menu_handle,callback=self.stored_pose_callback)
+            if m == "End-Effector Stored Poses" :
                 sub_menu_handle = self.marker_menus[waypoint].insert(m)
                 for p in self.robot_config.moveit_interface.get_stored_state_list(group) :
                     self.menu_handles[(waypoint,m,p)] = self.marker_menus[waypoint].insert(p,parent=sub_menu_handle,callback=self.stored_pose_callback)
@@ -834,14 +840,25 @@ class AffordanceTemplate(object) :
     def stored_pose_callback(self, feedback) :
         ee_id =int(feedback.marker_name.split(".")[0])
         ee_name = self.robot_config.get_end_effector_name(ee_id)
+        manipulator_name = self.robot_config.get_manipulator(ee_name)
+
+        print ee_id
+        print ee_name
+        print manipulator_name
         for p in self.robot_config.moveit_interface.get_stored_state_list(ee_name) :
-            if self.menu_handles[(feedback.marker_name,"Stored Poses",p)] == feedback.menu_entry_id :
-                print ee_name
-                print self.robot_config.stored_poses[ee_name][p]
+            if self.menu_handles[(feedback.marker_name,"End-Effector Stored Poses",p)] == feedback.menu_entry_id :
                 self.robot_config.moveit_interface.create_joint_plan_to_target(ee_name, self.robot_config.stored_poses[ee_name][p])
                 r = self.robot_config.moveit_interface.execute_plan(ee_name)
                 if not r : rospy.logerr(str("RobotTeleop::process_feedback(pose) -- failed moveit execution for group: " + ee_name + ". re-synching..."))
-                # if self.waypoint_auto_execute[ee_id] :
+        for p in self.robot_config.moveit_interface.get_stored_state_list(manipulator_name) :
+            if self.menu_handles[(feedback.marker_name,"Manipulator Stored Poses",p)] == feedback.menu_entry_id :
+                self.robot_config.moveit_interface.create_joint_plan_to_target(manipulator_name, self.robot_config.stored_poses[manipulator_name][p])
+                r = self.robot_config.moveit_interface.execute_plan(manipulator_name)
+                if not r : rospy.logerr(str("RobotTeleop::process_feedback(pose) -- failed moveit execution for group: " + manipulator_name + ". re-synching..."))
+                # else :
+                #     self.robot_config.moveit_interface.groups[manipulator_name].clear_pose_targets()
+                #     self.robot_config.moveit_interface.create_joint_plan_to_target(manipulator_name, self.robot_config.stored_poses[manipulator_name][p])
+                # # if self.waypoint_auto_execute[ee_id] :
                 #     self.robot_config.moveit_interface.create_joint_plan_to_target(ee_name, self.robot_config.stored_poses[ee_name][p])
                 #     r = self.robot_config.moveit_interface.execute_plan(ee_name)
                 #     if not r : rospy.logerr(str("RobotTeleop::process_feedback(pose) -- failed moveit execution for group: " + ee_name + ". re-synching..."))

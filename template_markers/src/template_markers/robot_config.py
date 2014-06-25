@@ -184,6 +184,13 @@ class RobotConfig(object) :
                     self.moveit_interface.add_group(pg, group_type="manipulator")
                     self.moveit_interface.set_display_mode(pg, "all_points")
                     # self.moveit_interface_threads[pg] = MoveItInterfaceThread(self.robot_name,self.config_package, g)
+
+                    self.stored_poses[pg] = {}
+                    for state_name in self.moveit_interface.get_stored_state_list(pg) :
+                        rospy.loginfo(str("RobotConfig::configure() adding stored pose \'" + state_name + "\' to group \'" + pg + "\'"))
+                        self.stored_poses[pg][state_name] = self.moveit_interface.get_stored_group_state(pg, state_name)
+
+
                 else :
                     print "no manipulator group found for end-effector: ", g
 
